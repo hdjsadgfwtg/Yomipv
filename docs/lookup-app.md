@@ -1,6 +1,6 @@
 ## Lookup App
 
-The Lookup App is an interactive overlay that displays dictionary definitions, pitch accents, and frequencies for words you select in mpv directly, All data is taken from your installed dictionaries in Yomitan.
+The Lookup App is an interactive overlay that displays dictionary definitions, pitch accents, and frequencies for words you select in MPV directly, All data is taken from your installed dictionaries in Yomitan.
 
 ## How it Works
 
@@ -12,7 +12,7 @@ The lookup window appears when you search for a word. Depending on your configur
 The window stays on top of MPV.
 
 ### Navigating Multiple Results
-If a word has multiple entries, you will counter (like `1 / 3`) at the top.
+If a word has multiple entries, you will see a counter (like `1 / 3`) at the top.
 - Click the Left/Right buttons of the lookup window to cycle through different entries.
 
 ### Sub-word Lookups
