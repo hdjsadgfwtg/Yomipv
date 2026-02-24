@@ -212,6 +212,10 @@ local default_options = {
 	-- Secondary subtitles
 	secondary_sid = true, -- Track secondary subtitle stream for translations
 	secondary_on_hover = true, -- Show secondary subtitles only during hover interactions
+
+	-- Keybindings
+	key_sub_seek_next = "Alt+RIGHT",
+	key_sub_seek_prev = "Alt+LEFT",
 }
 
 local options = default_options

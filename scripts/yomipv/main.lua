@@ -192,6 +192,18 @@ if config.key_clear_timings ~= "" then
 	end)
 end
 
+if config.key_sub_seek_next ~= "" then
+	mp.add_key_binding(config.key_sub_seek_next, "yomipv-sub-seek-next", function()
+		mp.commandv("sub-seek", "1")
+	end)
+end
+
+if config.key_sub_seek_prev ~= "" then
+	mp.add_key_binding(config.key_sub_seek_prev, "yomipv-sub-seek-prev", function()
+		mp.commandv("sub-seek", "-1")
+	end)
+end
+
 mp.register_script_message("yomipv-sync-selection", function(text)
 	msg.info("Received selection sync: " .. tostring(text))
 	handler:sync_selection(text)
