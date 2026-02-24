@@ -10,6 +10,7 @@ let allEntries = [];
 let currentEntryIndex = 0;
 let currentShowFrequencies = false;
 let currentDictionaryMedia = [];
+let lookupHistory = []; // Track previous lookups
 
 const filterDictionaryStyles = (styleEl, dictName) => {
   if (!styleEl || !styleEl.sheet || !styleEl.sheet.cssRules || styleEl.sheet.cssRules.length === 0) return '';
@@ -51,16 +52,21 @@ const filterDictionaryStyles = (styleEl, dictName) => {
   }
 };
 
-const renderHeader = (term, reading, furigana, frequencies) => {
+const renderHeader = (term, reading, frequencies) => {
   const cleanTerm = (term || '').trim();
 
+  // Wrap each character in a clickable span
+  const wrapChars = (text, startIndex = 0) => {
+    return Array.from(text).map((char, i) => 
+      `<span class="header-char" data-index="${startIndex + i}">${char}</span>`
+    ).join('');
+  };
+
   let headerHtml = '';
-  if (furigana && furigana.includes('[')) {
-    headerHtml = furigana.replace(/([^\[\]]+)\[([^\[\]]+)\]/g, '<ruby>$1<rt>$2</rt></ruby>');
-  } else if (reading && reading !== cleanTerm) {
-    headerHtml = `<ruby>${cleanTerm}<rt>${reading}</rt></ruby>`;
+  if (reading && reading !== cleanTerm) {
+    headerHtml = `<ruby><span class="header-base">${wrapChars(cleanTerm)}</span><rt>${reading}</rt></ruby>`;
   } else {
-    headerHtml = `<div class="term-expression">${cleanTerm}</div>`;
+    headerHtml = `<div class="term-expression">${wrapChars(cleanTerm)}</div>`;
   }
 
   let freqHtml = '';
@@ -81,10 +87,31 @@ const renderHeader = (term, reading, furigana, frequencies) => {
     <div class="term-display">
       ${headerHtml}
     </div>
-    <div class="header-frequencies">
-      ${freqHtml}
-    </div>
+    ${freqHtml ? `<div class="header-frequencies">${freqHtml}</div>` : ''}
   `;
+
+  // Attach click listeners to characters
+  headerEl.querySelectorAll('.header-char').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const index = parseInt(el.getAttribute('data-index'));
+      const subTerm = cleanTerm.substring(index);
+      if (subTerm && subTerm !== cleanTerm) {
+        console.log('[UI] Sending sync-selection for header click:', subTerm);
+        ipcRenderer.send('sync-selection-hint', subTerm);
+        performLookup(subTerm, currentShowFrequencies);
+      }
+    };
+  });
+
+  // Go back to previous term on right click
+  headerEl.oncontextmenu = (e) => {
+    e.preventDefault();
+    if (lookupHistory.length > 0) {
+      const prev = lookupHistory.pop();
+      performLookup(prev.term, prev.showFrequencies, true);
+    }
+  };
 };
 
 const applyPitchColor = (pitchTarget) => {
@@ -164,7 +191,6 @@ const renderEntry = (index, rawEntries, showFrequencies) => {
 
   const fields = entry.fields || entry;
   const term = fields.expression || '';
-  const furigana = fields.furigana || '';
   let reading = fields.reading || '';
   const pitchAccents = fields['pitch-accents'] || '';
 
@@ -176,7 +202,7 @@ const renderEntry = (index, rawEntries, showFrequencies) => {
   }
 
   const frequencies = buildFrequencies(rawEntries, fields.expression, fields.reading, showFrequencies);
-  renderHeader(term, reading, furigana, frequencies);
+  renderHeader(term, reading, frequencies);
   applyPitchColor(fields['pitch-accent-categories'] || '');
 
   if (fields.glossary || fields.definition) {
@@ -264,7 +290,7 @@ const renderEntry = (index, rawEntries, showFrequencies) => {
   entryPrev.style.display = showNav ? 'flex' : 'none';
   entryNext.style.display = showNav ? 'flex' : 'none';
   entryCounter.style.display = showNav ? '' : 'none';
-
+  
   // Sync active entry for Anki export matching
   ipcRenderer.send('active-entry', { expression: fields.expression, reading: fields.reading });
 };
@@ -291,17 +317,25 @@ const sendSelectedDict = (el) => {
   ipcRenderer.send('dictionary-selected', dictContent);
 };
 
-ipcRenderer.on('lookup-term', async (event, data) => {
-  console.log('[IPC] Received lookup data:', JSON.stringify(data));
+const performLookup = async (term, showFrequencies, isBack = false) => {
+  console.log('[UI] Performing lookup for:', term);
+  
+  // Save current term to history if not going back
+  if (!isBack && allEntries.length > 0 && currentEntryIndex < allEntries.length) {
+    const entry = allEntries[currentEntryIndex].fields || allEntries[currentEntryIndex];
+    if (entry.expression && entry.expression !== term) {
+      lookupHistory.push({ term: entry.expression, showFrequencies: currentShowFrequencies });
+    }
+  }
 
   allEntries = [];
   currentEntryIndex = 0;
-  currentShowFrequencies = data.showFrequencies || false;
+  currentShowFrequencies = showFrequencies || false;
   entryPrev.style.display = 'none';
   entryNext.style.display = 'none';
   entryCounter.style.display = 'none';
 
-  renderHeader(data.term, data.reading, null, null);
+  headerEl.innerHTML = '';
   glossaryEl.innerHTML = '<div class="loading">Looking up...</div>';
 
   try {
@@ -314,14 +348,13 @@ ipcRenderer.on('lookup-term', async (event, data) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            text: data.term,
+            text: term,
             type: 'term',
             markers: [
-              'glossary', 'expression', 'reading', 'furigana',
+              'glossary', 'expression', 'reading',
               'pitch-accent-categories', 'pitch-accents',
-              ...(data.showFrequencies ? ['frequencies'] : [])
+              ...(showFrequencies ? ['frequencies'] : [])
             ],
-            maxEntries: 10,
             includeMedia: true
           })
         });
@@ -343,17 +376,20 @@ ipcRenderer.on('lookup-term', async (event, data) => {
     const entries = (result && result.fields) || (result && result[0] && result[0].fields) || [];
 
     if (!Array.isArray(entries) || entries.length === 0) {
-      glossaryEl.innerHTML = `No result found for "${data.term}".`;
+      glossaryEl.innerHTML = `No result found for "${term}".`;
       return;
     }
 
     const sorted = [...entries].sort((a, b) => {
       const fa = a.fields || a;
       const fb = b.fields || b;
-      const scoreA = ((fa['pitch-accents'] && fa['pitch-accents'] !== '') ? 2 : 0) +
-                     ((fa.expression && fa.expression !== fa.reading) ? 1 : 0);
-      const scoreB = ((fb['pitch-accents'] && fb['pitch-accents'] !== '') ? 2 : 0) +
-                     ((fb.expression && fb.expression !== fb.reading) ? 1 : 0);
+      
+      const lenA = (fa.expression || '').length;
+      const lenB = (fb.expression || '').length;
+      if (lenA !== lenB) return lenB - lenA;
+
+      const scoreA = (fa.expression && fa.expression !== fa.reading) ? 1 : 0;
+      const scoreB = (fb.expression && fb.expression !== fb.reading) ? 1 : 0;
       return scoreB - scoreA;
     });
 
@@ -365,6 +401,12 @@ ipcRenderer.on('lookup-term', async (event, data) => {
     console.error('Lookup failed', e);
     glossaryEl.innerHTML = `Error fetching from Yomitan: ${e.message}`;
   }
+};
+
+ipcRenderer.on('lookup-term', async (event, data) => {
+  console.log('[IPC] Received lookup data:', JSON.stringify(data));
+  lookupHistory = [];
+  performLookup(data.term, data.showFrequencies);
 });
 
 entryPrev.addEventListener('click', () => {
@@ -383,7 +425,13 @@ let selectionTimeout;
 document.addEventListener('selectionchange', () => {
   clearTimeout(selectionTimeout);
   selectionTimeout = setTimeout(() => {
-    let selection = window.getSelection().toString().trim();
+    const selectionObj = window.getSelection();
+    if (selectionObj.rangeCount === 0 || selectionObj.isCollapsed) return;
+
+    const range = selectionObj.getRangeAt(0);
+    if (!glossaryEl.contains(range.commonAncestorContainer)) return;
+
+    let selection = selectionObj.toString().trim();
     if (!selection) return;
     selection = selection.replace(/\r?\n/g, '<br>');
     ipcRenderer.send('sync-selection', selection);

@@ -197,6 +197,11 @@ mp.register_script_message("yomipv-sync-selection", function(text)
 	handler:sync_selection(text)
 end)
 
+mp.register_script_message("yomipv-sync-selection-hint", function(text)
+	msg.info("Received selection hint sync: " .. tostring(text))
+	handler:sync_selection_hint(text)
+end)
+
 mp.register_script_message("yomipv-dictionary-selected", function(text)
 	msg.info("Received dictionary selection")
 	handler:set_selected_dictionary(text)

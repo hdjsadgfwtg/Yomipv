@@ -65,7 +65,7 @@ body {
   line-height: 1.1;
   display: flex;
   flex-direction: row;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: flex-start;
   gap: 12px;
 }
@@ -81,14 +81,32 @@ body {
   font-weight: 700;
 }
 
+.header-char {
+  cursor: pointer;
+  transition: color 0.15s, text-shadow 0.15s;
+}
+
+.header-char:hover {
+  color: var(--selection-color);
+  text-shadow: 0 0 8px rgba(86, 255, 104, 0.4);
+}
+
+.header-base {
+  display: block;
+  white-space: nowrap;
+}
+
 #glossary-content {
   font-size: 20px;
   line-height: 1.5;
   width: 100%;
 }
 
-.header-frequencies {
+.header-frequencies:not(:empty) {
   border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.header-frequencies {
   padding-left: 12px;
   padding-right: 36px;
   flex: 1;
@@ -303,6 +321,9 @@ span[style*="display:inline"]:has(+ span[style*="border:1.5px dotted #c83c28"]) 
 
 /* Ruby styling */
 #term-header ruby {
+  display: inline-flex;
+  flex-direction: column-reverse;
+  align-items: center;
   font-family: var(--font-serif);
   font-size: 32px;
   ruby-position: over;
@@ -310,6 +331,7 @@ span[style*="display:inline"]:has(+ span[style*="border:1.5px dotted #c83c28"]) 
 }
 
 #term-header rt {
+  display: block;
   font-family: var(--font-sans);
   font-size: 20px;
   color: inherit;

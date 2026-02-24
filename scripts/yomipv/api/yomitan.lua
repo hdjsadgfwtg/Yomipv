@@ -4,7 +4,6 @@ local utils = require("mp.utils")
 local msg = require("mp.msg")
 
 local DEFAULT_SCAN_LENGTH = 10
-local DEFAULT_MAX_ENTRIES = 5
 local PUNCTUATION_PATTERN = "[%s%p。、？！（）「」『』〜➨]"
 local WHITESPACE_PATTERN = "[%z\1-\32\127]"
 
@@ -199,7 +198,6 @@ function Yomitan:get_anki_fields(term, markers, context, callback, active_expres
 		text = lookup_text,
 		type = "term",
 		markers = markers,
-		maxEntries = DEFAULT_MAX_ENTRIES,
 		includeMedia = true,
 	}
 

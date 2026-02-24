@@ -161,6 +161,9 @@ function Handler:initialize_export_context(gui)
 	-- Reset pinned entry state from previous session
 	self.active_entry_expression = nil
 	self.active_entry_reading = nil
+	self.selected_dictionary = nil
+	self.last_selection = nil
+	self.last_selection_hint = nil
 
 	local sub = self.deps.tracker.export_current_session()
 	local primary = StringOps.clean_subtitle(sub and sub.primary_sid or "", true)
@@ -421,6 +424,48 @@ function Handler:process_note_content(context, entry, data, picture, audio, sele
 	if Collections.is_void(cloze_body) then
 		cloze_prefix, cloze_body, cloze_suffix =
 			split_cloze(context.sub.primary_sid, entry.expression, selected_token.text, selected_token.offset)
+	end
+
+	-- Narrow highlight to word selected in the lookup
+	if not Collections.is_void(cloze_body) then
+		local expression = entry.expression
+		local hint = self.last_selection_hint
+
+		local target_start, target_end = nil, nil
+
+		if not Collections.is_void(expression) then
+			target_start, target_end = cloze_body:find(expression, 1, true)
+		end
+
+		if not target_start and not Collections.is_void(hint) then
+			target_start, target_end = cloze_body:find(hint, 1, true)
+		end
+
+		if not target_start and not Collections.is_void(expression) then
+			local stem = ""
+			for i = 1, #expression do
+				local prefix = expression:sub(1, i)
+				local s, _ = cloze_body:find(prefix, 1, true)
+				if s then
+					stem = prefix
+				else
+					break
+				end
+			end
+
+			if #stem > 0 then
+				target_start, target_end = cloze_body:find(stem, 1, true)
+				if target_start then
+					target_end = #cloze_body
+				end
+			end
+		end
+
+		if target_start and (cloze_body ~= cloze_body:sub(target_start, target_end)) then
+			cloze_prefix = (cloze_prefix or "") .. cloze_body:sub(1, target_start - 1)
+			cloze_suffix = cloze_body:sub(target_end + 1) .. (cloze_suffix or "")
+			cloze_body = cloze_body:sub(target_start, target_end)
+		end
 	end
 
 	if not Collections.is_void(self.config.sentence_field) then
@@ -813,6 +858,14 @@ function Handler:set_selected_dictionary(text)
 	msg.info("Handler: Selected dictionary updated")
 end
 
+function Handler:sync_selection(text)
+	self.last_selection = text ~= "" and text or nil
+end
+
+function Handler:sync_selection_hint(text)
+	self.last_selection_hint = text ~= "" and text or nil
+end
+
 function Handler:set_active_entry(expression, reading)
 	self.active_entry_expression = expression ~= "" and expression or nil
 	self.active_entry_reading = reading ~= "" and reading or nil
@@ -826,6 +879,7 @@ function Handler:new()
 		deps = nil,
 		expand_to_subtitle = nil,
 		last_selection = nil,
+		last_selection_hint = nil,
 		active_entry_expression = nil,
 		active_entry_reading = nil,
 		pending_lookup_term = nil,
