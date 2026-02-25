@@ -663,6 +663,11 @@ function Handler:update_range_async(context, direction, completion_callback)
 				local cleaned_adjacent_sid = StringOps.clean_subtitle(adjacent_subtitle.primary_sid)
 				local cleaned_adjacent_secondary_sid = StringOps.clean_subtitle(adjacent_subtitle.secondary_sid)
 
+				if context.current_subtitle_text:find(cleaned_adjacent_sid, 1, true) then
+					done()
+					return
+				end
+
 				-- Shift indices when prepending to maintain relative alignment
 				if direction < 0 then
 					context.first_subtitle = adjacent_subtitle

@@ -73,7 +73,7 @@ function Monitor.add_to_history(subtitle)
 	local primary_has_jp = StringOps.has_japanese(primary)
 	local secondary_has_jp = StringOps.has_japanese(secondary)
 
-	-- Validate primary text
+	-- Validate primary subtitle
 	if not primary_has_jp then
 		if secondary_has_jp then
 			-- Swap if secondary has Japanese
@@ -81,6 +81,23 @@ function Monitor.add_to_history(subtitle)
 		else
 			-- Discard if usage missing
 			return
+		end
+	end
+
+	-- Validate secondary subtitle alignment
+	if secondary ~= "" and subtitle.secondary_end and subtitle.secondary_start then
+		local p_start = subtitle.start or 0
+		local p_end = subtitle["end"] or 0
+		local s_start = subtitle.secondary_start
+		local s_end = subtitle.secondary_end
+
+		local overlap_start = math.max(p_start, s_start)
+		local overlap_end = math.min(p_end, s_end)
+		local overlap_duration = overlap_end - overlap_start
+
+		if overlap_duration < 0.3 then
+			msg.info("Discarding misaligned secondary subtitle (overlap: " .. string.format("%.3f", overlap_duration) .. "s)")
+			secondary = ""
 		end
 	end
 
@@ -121,13 +138,17 @@ function Monitor.add_to_history(subtitle)
 
 	-- Update existing secondary text
 	if overlap_entry then
-		if normalize(overlap_entry.primary_sid) == normalize(primary) then
+		local norm_overlap = normalize(overlap_entry.primary_sid)
+		local norm_new = normalize(primary)
+		if norm_overlap == norm_new or norm_overlap:find(norm_new, 1, true) then
 			if secondary ~= "" then
 				local norm_existing_sec = normalize(overlap_entry.secondary_sid)
 				local norm_new_sec = normalize(secondary)
 
 				-- Append unique segments
-				if not norm_existing_sec:find(norm_new_sec, 1, true) then
+				if norm_existing_sec == "" then
+					overlap_entry.secondary_sid = secondary
+				elseif not norm_existing_sec:find(norm_new_sec, 1, true) then
 					overlap_entry.secondary_sid = overlap_entry.secondary_sid .. "\n" .. secondary
 					-- Extend duration
 					overlap_entry.secondary_end =
@@ -169,7 +190,11 @@ function Monitor.add_to_history(subtitle)
 			-- Merge if secondary persists
 			if overlap_ratio > 0.5 then
 				if Monitor.history_smart_merge then
-					previous_entry.primary_sid = previous_entry.primary_sid .. "\n" .. primary
+					local norm_existing = normalize(previous_entry.primary_sid)
+					local norm_new = normalize(primary)
+					if not norm_existing:find(norm_new, 1, true) then
+						previous_entry.primary_sid = previous_entry.primary_sid .. "\n" .. primary
+					end
 					previous_entry["end"] = subtitle["end"] or previous_entry["end"]
 					return
 				end
@@ -305,10 +330,16 @@ function Monitor.export_current_session()
 	if sub_text and sub_text ~= "" then
 		-- Use history for merged lines
 		local history = Monitor.get_history()
+		local sub_norm = normalize(sub_text)
 		for i = #history, 1, -1 do
 			local entry = history[i]
-			-- Match text and time
-			if math.abs(entry.start - sub_start) < 0.2 and normalize(entry.primary_sid) == normalize(sub_text) then
+			local entry_norm = normalize(entry.primary_sid)
+			-- Match if time overlaps OR text is a substring (for mid-merge selection)
+			local time_match = math.abs(entry.start - sub_start) < 0.2
+			local time_overlap = (sub_start >= entry.start - 0.1) and (sub_start <= entry["end"] + 0.1)
+			local text_match = (entry_norm == sub_norm) or (entry_norm:find(sub_norm, 1, true))
+
+			if (time_match or time_overlap) and text_match then
 				return {
 					primary_sid = entry.primary_sid,
 					secondary_sid = entry.secondary_sid,
@@ -338,8 +369,15 @@ function Monitor.get_adjacent_sub(target, direction)
 	local history = Monitor.get_history()
 	local target_idx = nil
 
+	local target_norm = normalize(target.primary_sid)
+
 	for i, sub in ipairs(history) do
-		if math.abs(sub.start - target.start) < 0.1 then
+		local sub_norm = normalize(sub.primary_sid)
+		-- Check for match by time OR contained text
+		local time_match = math.abs(sub.start - target.start) < 0.1
+		local text_match = (sub_norm == target_norm) or (sub_norm:find(target_norm, 1, true))
+
+		if time_match or text_match then
 			target_idx = i
 			break
 		end
