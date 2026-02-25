@@ -1,15 +1,15 @@
 # Yomipv
 
-Yomipv is a script that combines Yomitan with MPV to create anki cards from Japanese media without leaving the player.
-There's no need to do alt tabs to switch between MPV, texthooker and Yomitan while mining or doing word lookups. 
-It was made designed to be used with [Senren Note Type v5.0.0](https://github.com/BrenoAqua/Senren), but it should work with any note type.
+Yomipv is a script that combines Yomitan with MPV to create Anki cards from Japanese media without leaving the player.
+There's no need to alt-tab between MPV and Yomitan while mining or doing word lookups.
+It was designed to be used with [Senren Note Type](https://github.com/BrenoAqua/Senren), but it should work with any note type.
 
 https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 
 ## Requirements
 
 - **[MPV](https://mpv.io/)** (0.33.0 or higher)
-- **[FFmpeg](https://ffmpeg.org/)** (Required for media extraction, but fallbacks to mpv's internal encoder if not found)
+- **[FFmpeg](https://ffmpeg.org/)** (Required for media extraction, falls back to MPV's internal encoder if not found)
 - **[Anki](https://apps.ankiweb.net/)** with **[AnkiConnect](https://ankiweb.net/shared/info/2055492159)**
 - **[Yomitan](https://yomitan.wiki/)** and **[Yomitan Api](https://github.com/yomidevs/yomitan-api)**
 - **[Node.js](https://nodejs.org/)** (Required for the lookup app)
@@ -40,7 +40,7 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 
 1. Open a video with Japanese subtitles in MPV
 2. Press **`c`** to activate the word selector
-3. Navigate with **arrow keys** or **mouse hover** to select a word
+3. Navigate with **mouse hover** or **arrow keys** to select a word
 4. Press **`Enter`**, **`c`**, or **left-click** to create an Anki card
 
 ### Advanced Features
@@ -52,14 +52,25 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
   - **`Ctrl+Left`** / **`Ctrl+Right`**: Expand selection to adjacent words
   - **`Shift+Left`** / **`Shift+Right`**: Expand to previous/next subtitle line
 
-- **Word Splitting (`s` or right-click)**: Split compound words into smaller segments
+- **Mora-level Navigation**:
+  - When `selector_mora_hover` is enabled, hovering over a word narrows the lookup to start from mora under your cursor instead of the full word
+  - **`s`**: Toggle mora-level keyboard navigation (left/right moves by mora instead of word)
 
-- **Dictionary Lookup (`Ctrl+c`)**: Open real-time dictionary definitions window that uses your yomitan glossary
+- **Lookup App (`Ctrl+c`)**: Opens a popup window powered by your Yomitan dictionaries, showing definitions, pitch accents, and frequencies
+  - **Right-click** on the word in the selector to lock the lookup. It stays locked on the current word to avoid triggering another lookup when you move the cursor over other words
+  - **Click any mora** in the header to narrow the lookup to a sub-word
+  - **Right-click the header** in the lookup to go back to the previous word
+  - See [docs/lookup-app.md](docs/lookup-app.md) for full details
+
+- **Manual Timing**:
+  - **`q`** / **`w`**: Set a custom start/end time for audio and picture extraction
+  - Unset start or end times default to the subtitle boundaries when opening the selector
+  - **`e`**: Clear manual timings
 
 - **History Panel (`a`)**: Toggle subtitle history panel
   - Click on previous/next lines to select them to expand the subtitle lines (when selector is open) or seek to that timestamp (when selector is closed)
 
-There are demos for all features [here](https://github.com/BrenoAqua/Yomipv/tree/main/features)
+There are demos for some features [here](https://github.com/BrenoAqua/Yomipv/tree/main/features)
 
 ## Troubleshooting
 
