@@ -16,6 +16,7 @@ local default_options = {
 
 	-- Note fields
 	expression_field = "word",
+	expression_furigana_field = "",
 	reading_field = "reading",
 	pitch_accents_field = "pitchAccents",
 	pitch_position_field = "pitchPositions",

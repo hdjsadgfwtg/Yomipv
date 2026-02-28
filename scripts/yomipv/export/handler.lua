@@ -18,6 +18,7 @@ local DEFAULT_YOMITAN_FIELDS = {
 	"cloze-body",
 	"cloze-suffix",
 	"sentence-furigana",
+	"furigana-plain",
 	"audio",
 	"pitch-accents",
 	"pitch-accent-positions",
@@ -517,6 +518,7 @@ function Handler:apply_yomitan_fields(note_fields, entry)
 	end
 
 	set_field(self.config.expression_field, get_field_value(entry, "expression"))
+	set_field(self.config.expression_furigana_field, get_field_value(entry, "furigana-plain"))
 	set_field(self.config.reading_field, get_field_value(entry, "reading"))
 	set_field(self.config.pitch_accents_field, get_field_value(entry, "pitch-accents"))
 	set_field(self.config.pitch_categories_field, get_field_value(entry, "pitch-accent-categories"))
