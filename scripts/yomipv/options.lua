@@ -140,6 +140,8 @@ local default_options = {
 	selector_show_history = true, -- Include recent lines in selector view
 	selector_hide_ui = true, -- Hide player UI while selector is active
 	selector_navigation_delay = 0.05, -- Input delay between repeated navigation actions
+	selector_trigger_on_mouse_move = false, -- Automatically trigger selector on mouse movement after idle
+	selector_trigger_mouse_idle_time = 5.0, -- Seconds mouse must be idle before movement triggers selector
 
 	-- Lookup
 	selector_lookup_on_hover = false, -- Automatically show lookup on hover
