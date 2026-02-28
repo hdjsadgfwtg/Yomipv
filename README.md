@@ -39,7 +39,7 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 ### Basic Workflow
 
 1. Open a video with Japanese subtitles in MPV
-2. Press **`c`** to activate the word selector
+2. Press **`c`** or **move your mouse after an idle period** (if `selector_trigger_on_mouse_move` is enabled) to activate the word selector
 3. Navigate with **mouse hover** or **arrow keys** to select a word
 4. Press **`Enter`**, **`c`**, or **left-click** to create an Anki card
 
@@ -61,6 +61,10 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
   - **Click any mora** in the header to narrow the lookup to a sub-word
   - **Right-click the header** in the lookup to go back to the previous word
   - See [docs/lookup-app.md](docs/lookup-app.md) for full details
+
+- **Auto-Trigger Selector**:
+  - Automatically open the selector by moving the mouse after it has been idle.
+  - Enable `selector_trigger_on_mouse_move` and customize `selector_trigger_mouse_idle_time` in `yomipv.conf`.
 
 - **Manual Timing**:
   - **`q`** / **`w`**: Set a custom start/end time for audio and picture extraction
