@@ -15,7 +15,9 @@ function Curl.post(url, json_body, callback)
 end
 
 -- Execute request with detailed callback
-function Curl.request(url, json_body, callback)
+function Curl.request(url, json_body, callback, retry_count)
+	retry_count = retry_count or 0
+	local max_retries = 2
 	local temp_dir = Platform.get_temp_dir()
 	local sep = Platform.get_path_separator()
 	local temp_file = string.format("%s%syomipv_req_%d_%d.json", temp_dir, sep, os.time(), math.random(10000, 99999))
@@ -40,11 +42,15 @@ function Curl.request(url, json_body, callback)
 		"--connect-timeout",
 		"5",
 		"--max-time",
-		"10",
+		"20",
 		url,
 	}
 
-	msg.info("Executing curl request to: " .. url)
+	if retry_count > 0 then
+		msg.info(string.format("Retrying curl request to %s (attempt %d/%d)", url, retry_count, max_retries))
+	else
+		msg.info("Executing curl request to: " .. url)
+	end
 
 	mp.command_native_async({
 		name = "subprocess",
@@ -53,27 +59,35 @@ function Curl.request(url, json_body, callback)
 		capture_stderr = true,
 		args = args,
 	}, function(success, result, error)
-		-- Clean up temp file
 		os.remove(temp_file)
+
+		local status = result and result.status or -1
+		local stdout = result and result.stdout or ""
+		local stderr = result and result.stderr or error or ""
 
 		msg.info(
 			string.format(
 				"Curl finished: success=%s, status=%s, stdout_len=%d, stderr_len=%d",
 				tostring(success),
-				tostring(result and result.status),
-				(result and result.stdout or ""):len(),
-				(result and result.stderr or ""):len()
+				tostring(status),
+				stdout:len(),
+				stderr:len()
 			)
 		)
 
-		if result and result.stdout and result.stdout ~= "" then
-			msg.info("Curl stdout preview: " .. result.stdout:sub(1, 100))
+		if status == 28 and retry_count < max_retries then
+			msg.warn(string.format("Curl request timed out. Retrying... (%d/%d)", retry_count + 1, max_retries))
+			return Curl.request(url, json_body, callback, retry_count + 1)
+		end
+
+		if stdout ~= "" then
+			msg.info("Curl stdout preview: " .. stdout:sub(1, 100))
 		end
 
 		local output = {
-			status = result and result.status or -1,
-			stdout = result and result.stdout or "",
-			stderr = result and result.stderr or error or "",
+			status = status,
+			stdout = stdout,
+			stderr = stderr,
 		}
 
 		local is_success = success and output.status == 0

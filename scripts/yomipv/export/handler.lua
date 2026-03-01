@@ -753,6 +753,9 @@ function Handler:build_selector_style(update_range_fn, was_paused)
 			end
 		end,
 		on_lookup = function(data)
+			if self.pending_lookup_term == data.term and self.pending_lookup_reading == data.reading then
+				return
+			end
 			self.selected_dictionary = nil
 			self.active_entry_expression = nil
 			self.active_entry_reading = nil
@@ -883,8 +886,6 @@ end
 function Handler:set_active_entry(expression, reading)
 	self.active_entry_expression = expression ~= "" and expression or nil
 	self.active_entry_reading = reading ~= "" and reading or nil
-	self.pending_lookup_term = nil
-	self.pending_lookup_reading = nil
 end
 
 function Handler:new()
@@ -905,10 +906,6 @@ function Handler:new()
 	setmetatable(obj, self)
 	self.__index = self
 	return obj
-end
-
-function Handler:sync_selection(text)
-	self.last_selection = text ~= "" and text or nil
 end
 
 function Handler:set_manual_start()
