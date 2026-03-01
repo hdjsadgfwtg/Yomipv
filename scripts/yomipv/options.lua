@@ -184,6 +184,7 @@ local default_options = {
 	key_selection_prev = "Ctrl+LEFT",
 	key_selector_lookup = "Ctrl+c",
 	key_toggle_mora_navigation = "s",
+	key_toggle_selector_trigger_on_mouse_move = "z",
 	key_append_mode = "C",
 	key_set_timing_start = "",
 	key_set_timing_end = "",
