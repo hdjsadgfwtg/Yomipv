@@ -86,7 +86,7 @@ local function split_cloze(context, target, surface, offset)
 end
 
 local function format_sentence_html(self, prefix, body, suffix, tag)
-	local closing_tag = tag:match("<(%w+)")
+	local closing_tag = tag:match("<([%w%-]+)")
 	closing_tag = closing_tag and ("</" .. closing_tag .. ">") or "</span>"
 	local content = string.format("%s%s%s%s%s", prefix or "", tag or "", body or "", closing_tag, suffix or "")
 	return string.format(self.config.primary_sentence_wrapper, content)
