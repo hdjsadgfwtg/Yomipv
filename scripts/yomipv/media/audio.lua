@@ -27,8 +27,15 @@ function Audio.create_job(subtitle)
 		return nil
 	end
 
-	local start_time = subtitle.start or 0
-	local end_time = subtitle["end"] or 0
+	local offset = Audio.config.audio_offset or 0
+	local end_offset = Audio.config.audio_end_offset or 0
+	local start_time = math.max(0, (subtitle.start or 0) + offset)
+	local end_time = (subtitle["end"] or 0) + end_offset
+
+	if end_time <= start_time then
+		msg.error("Invalid audio extraction range")
+		return nil
+	end
 
 	local source = mp.get_property("path", "")
 	if not source or source == "" then

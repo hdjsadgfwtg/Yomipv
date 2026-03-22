@@ -131,6 +131,8 @@ local default_options = {
 	audio_use_ffmpeg = true, -- Use FFmpeg instead of MPV for extraction
 	audio_format = "opus", -- Format: mp3, opus
 	audio_bitrate = "64k",
+	audio_offset = 0.0, -- Offset in seconds relative to subtitle start
+	audio_end_offset = 0.0, -- Offset in seconds relative to subtitle end
 	filename_show_ms = true, -- Include milliseconds in filenames
 	audio_match_volume = false, -- Match extracted audio volume to mpv volume
 
