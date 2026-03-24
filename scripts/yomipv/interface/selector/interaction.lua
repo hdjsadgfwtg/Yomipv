@@ -33,7 +33,7 @@ local function trigger_lookup_if_enabled(selector, trigger_source)
 		local state = selector:get_selection_state()
 		if state and selector.tokens[selector.index] and selector.tokens[selector.index].is_term then
 			local data = {
-				term = state.text,
+				term = state.context_text or state.text,
 				reading = state.reading,
 			}
 			if selector.style.on_lookup then
@@ -265,7 +265,7 @@ local function on_lookup(selector)
 	end
 
 	local data = {
-		term = state.text,
+		term = state.context_text or state.text,
 		reading = state.reading,
 	}
 
@@ -289,7 +289,6 @@ function Interaction.check_hover(selector)
 		if mx >= entry.x1 and mx <= entry.x2 and my >= entry.y1 and my <= entry.y2 then
 			local char_index = nil
 			if selector.style.selector_mora_hover then
-				-- Calculate character offset from mouse position
 				local token = selector.tokens[entry.index]
 				if token and token.is_term then
 					local relative_x = mx - entry.x1
@@ -314,6 +313,8 @@ function Interaction.check_hover(selector)
 			if selector.index ~= entry.index or selector.mora_index ~= char_index or selector.pending_initial_hover_lookup then
 				selector.index = entry.index
 				selector.mora_index = char_index
+				selector.selection_len = 1
+				selector.tail_mora_index = nil
 				hide_if_needed(selector, "hover")
 				selector:render()
 				if not selector.lookup_locked then
@@ -326,10 +327,6 @@ function Interaction.check_hover(selector)
 	end
 
 	if not hit then
-		if selector.mora_index and not selector.style.selector_mora_navigation then
-			selector.mora_index = nil
-			selector:render()
-		end
 		if selector.style.on_hover_fallback then
 			selector.style.on_hover_fallback()
 		end
@@ -402,11 +399,15 @@ function Interaction.bind(selector)
 	mp.add_forced_key_binding("MOUSE_BTN2", "selector-lock-mouse", function()
 		selector.lookup_locked = not selector.lookup_locked
 		if selector.lookup_locked then
-			selector.locked_index = selector.index
-			selector.locked_mora_index = selector.mora_index
+			selector.locked_index          = selector.index
+			selector.locked_mora_index     = selector.mora_index
+			selector.locked_selection_len  = selector.selection_len
+			selector.locked_tail_mora      = selector.tail_mora_index
 		else
-			selector.locked_index = nil
-			selector.locked_mora_index = nil
+			selector.locked_index         = nil
+			selector.locked_mora_index    = nil
+			selector.locked_selection_len = nil
+			selector.locked_tail_mora     = nil
 			trigger_lookup_if_enabled(selector, "hover")
 		end
 		selector:render()

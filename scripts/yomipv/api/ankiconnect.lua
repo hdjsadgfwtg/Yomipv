@@ -8,20 +8,19 @@ local AnkiConnect = {}
 
 local DEFAULT_VERSION = 6
 
--- Creates AnkiConnect client instance
 function AnkiConnect.new(config, curl)
 	local obj = {
 		config = config,
 		curl = curl,
 		url = "http://" .. config.ankiconnect_url,
 		media_dir_path = nil,
+		_pending_media_path_callbacks = nil,
 	}
 	setmetatable(obj, AnkiConnect)
 	AnkiConnect.__index = AnkiConnect
 	return obj
 end
 
--- Execute AnkiConnect API request
 function AnkiConnect:request(action, params, callback)
 	if not self.url then
 		return callback(nil, "AnkiConnect URL not configured")
@@ -67,7 +66,6 @@ function AnkiConnect:request(action, params, callback)
 	end)
 end
 
--- Add note to Anki
 function AnkiConnect:add_note(deck, note_type, fields, tags, callback)
 	local tag_array = tags
 	if type(tags) == "string" then
@@ -92,7 +90,6 @@ function AnkiConnect:add_note(deck, note_type, fields, tags, callback)
 	self:request("addNote", params, callback)
 end
 
--- Update note fields
 function AnkiConnect:update_note_fields(note_id, fields, callback)
 	local params = {
 		note = {
@@ -109,7 +106,6 @@ function AnkiConnect:update_note_fields(note_id, fields, callback)
 	end)
 end
 
--- Stores file in Anki media collection
 function AnkiConnect:store_media_file(filename, data, callback)
 	local params = {
 		filename = filename,
@@ -124,7 +120,6 @@ function AnkiConnect:store_media_file(filename, data, callback)
 	end)
 end
 
--- Base64 media ingestion
 function AnkiConnect:ingest_media(filename, content, callback)
 	self:store_media_file(filename, content, function(_success, error)
 		if error then
@@ -138,25 +133,36 @@ function AnkiConnect:ingest_media(filename, content, callback)
 	end)
 end
 
--- Fetches Anki media directory path
 function AnkiConnect:get_media_dir_path(callback)
 	if self.media_dir_path then
 		return callback(self.media_dir_path, nil)
 	end
+
+	if self._pending_media_path_callbacks then
+		table.insert(self._pending_media_path_callbacks, callback)
+		return
+	end
+
+	self._pending_media_path_callbacks = { callback }
+
 	self:request("getMediaDirPath", {}, function(result, error)
 		if not error and result then
 			self.media_dir_path = result
 		end
-		callback(result, error)
+
+		local callbacks = self._pending_media_path_callbacks
+		self._pending_media_path_callbacks = nil
+
+		for _, cb in ipairs(callbacks) do
+			cb(result, error)
+		end
 	end)
 end
 
--- Alias for get_media_dir_path
 function AnkiConnect:get_media_path(callback)
 	return self:get_media_dir_path(callback)
 end
 
--- Open Anki browser with query
 function AnkiConnect:gui_browse(query, callback)
 	local params = {
 		query = query or "",
@@ -165,7 +171,6 @@ function AnkiConnect:gui_browse(query, callback)
 	self:request("guiBrowse", params, callback)
 end
 
--- Focus note in Anki browser
 function AnkiConnect:gui_select_note(note_id, callback)
 	local params = {
 		note = note_id,
@@ -179,7 +184,6 @@ function AnkiConnect:gui_select_note(note_id, callback)
 	end)
 end
 
--- Find notes matching query
 function AnkiConnect:find_notes(query, callback)
 	local params = {
 		query = query,
@@ -188,7 +192,6 @@ function AnkiConnect:find_notes(query, callback)
 	self:request("findNotes", params, callback)
 end
 
--- Get detailed note info
 function AnkiConnect:notes_info(note_ids, callback)
 	local params = {
 		notes = note_ids,
@@ -197,7 +200,6 @@ function AnkiConnect:notes_info(note_ids, callback)
 	self:request("notesInfo", params, callback)
 end
 
--- Get fields for specific note
 function AnkiConnect:get_note_fields(note_id, callback)
 	self:notes_info({ note_id }, function(notes, error)
 		if error then
@@ -219,7 +221,6 @@ function AnkiConnect:get_note_fields(note_id, callback)
 	end)
 end
 
--- Sync media fields for a note
 function AnkiConnect:sync_media_fields(note_id, fields, _tags, callback)
 	self:update_note_fields(note_id, fields, function(_success, error)
 		if error then

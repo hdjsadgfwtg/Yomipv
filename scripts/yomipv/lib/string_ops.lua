@@ -109,7 +109,7 @@ function StringOps.sanitize_filename(filename)
 	return StringOps.trim(sanitized)
 end
 
--- Extract and clean media title from metadata or path
+-- Extract media title from metadata or path
 function StringOps.clean_title(title, path)
 	local s = title
 	if not s or s == "" then
@@ -174,6 +174,86 @@ function StringOps.has_japanese(text)
 	local found = text:find("[\227][\128-\131]") or text:find("[\228-\233]") or text:find("[\239][\189-\190]")
 
 	return found ~= nil
+end
+
+-- Iterator that yields (next_index, codepoint)
+local function utf8_iter(s, i)
+	if not s then
+		return nil
+	end
+	i = i or 1
+	if i > #s then
+		return nil
+	end
+	local c = string.byte(s, i)
+	local code
+	local next_i
+	if c < 128 then
+		code = c
+		next_i = i + 1
+	elseif c >= 194 and c <= 223 then
+		local c2 = string.byte(s, (i + 1)) or 0
+		code = ((c - 192) * 64) + (c2 - 128)
+		next_i = i + 2
+	elseif c >= 224 and c <= 239 then
+		local c2 = string.byte(s, (i + 1)) or 0
+		local c3 = string.byte(s, (i + 2)) or 0
+		code = ((c - 224) * 4096) + ((c2 - 128) * 64) + (c3 - 128)
+		next_i = i + 3
+	elseif c >= 240 and c <= 244 then
+		local c2 = string.byte(s, (i + 1)) or 0
+		local c3 = string.byte(s, (i + 2)) or 0
+		local c4 = string.byte(s, (i + 3)) or 0
+		code = ((c - 240) * 262144) + ((c2 - 128) * 4096) + ((c3 - 128) * 64) + (c4 - 128)
+		next_i = i + 4
+	else
+		code = c
+		next_i = i + 1
+	end
+	return next_i, code
+end
+
+function StringOps.utf8_codes(str)
+	return utf8_iter, str, 1
+end
+
+function StringOps.get_char_count(text)
+	local count = 0
+	for _ in StringOps.utf8_codes(text) do
+		count = count + 1
+	end
+	return count
+end
+
+function StringOps.get_char_byte_pos(text, char_index)
+	if not char_index or char_index <= 1 then
+		return 1
+	end
+	local i = 1
+	local current_char = 0
+	for next_i, _ in StringOps.utf8_codes(text) do
+		current_char = current_char + 1
+		if current_char == char_index then
+			return i
+		end
+		i = next_i
+	end
+	return i
+end
+
+function StringOps.count_shared_prefix(a, b)
+	if not a or not b then return 0 end
+	local shared = 0
+	local iter_b, state_b, cur_b = StringOps.utf8_codes(b)
+	for _, code_a in StringOps.utf8_codes(a) do
+		local n_b, code_b = iter_b(state_b, cur_b)
+		if not n_b or code_a ~= code_b then
+			break
+		end
+		shared = shared + 1
+		cur_b = n_b
+	end
+	return shared
 end
 
 return StringOps

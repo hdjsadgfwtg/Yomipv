@@ -64,9 +64,20 @@ local function split_cloze(context, target, surface, offset)
 	local start_idx, end_idx
 
 	if surface and offset then
-		local sub = context:sub(offset + 1, offset + #surface)
+		local Selector = require("interface.selector.selector")
+		local byte_start = 1
+		local char_count = 0
+		for next_i, _ in Selector.utf8_codes(context) do
+			if char_count == offset then
+				break
+			end
+			char_count = char_count + 1
+			byte_start = next_i
+		end
+
+		local sub = context:sub(byte_start, byte_start + #surface - 1)
 		if sub == surface then
-			return context:sub(1, offset), surface, context:sub(offset + #surface + 1)
+			return context:sub(1, byte_start - 1), surface, context:sub(byte_start + #surface)
 		end
 	end
 
@@ -338,13 +349,44 @@ function Handler:handle_selector_result(context, selected_token)
 	local effective_expr = self.active_entry_expression
 	local effective_reading = self.active_entry_reading
 
-	self.deps.yomitan:get_anki_fields(selected_token.text, yomitan_fields, {
+	local exact_text = selected_token.text
+	if effective_expr and effective_expr ~= "" then
+		local expr_no_space = effective_expr:gsub("[%s%p]", "")
+		local tk_no_space = exact_text:gsub("[%s%p]", "")
+		local function slice_prefix(text, prefix)
+			local byte_len = #prefix
+			if text:sub(1, byte_len) == prefix then
+				return text:sub(1, byte_len)
+			end
+			return nil
+		end
+
+		local sliced = slice_prefix(tk_no_space, expr_no_space)
+		if sliced then
+			exact_text = sliced
+		elseif effective_reading and effective_reading ~= "" then
+			local read_no_space = effective_reading:gsub("[%s%p]", "")
+			sliced = slice_prefix(tk_no_space, read_no_space)
+			if sliced then
+				exact_text = sliced
+			end
+		end
+	end
+
+	local export_token = {
+		text = exact_text,
+		offset = selected_token.offset,
+		headwords = selected_token.headwords,
+		reading = selected_token.reading
+	}
+
+	self.deps.yomitan:get_anki_fields(export_token.text, yomitan_fields, {
 		text = context.current_subtitle_text,
 		selection = self.last_selection,
-		start = selected_token.offset,
-		["end"] = selected_token.offset + selected_token.text:len(),
+		start = export_token.offset,
+		["end"] = export_token.offset + self.deps.selector.get_char_count(export_token.text),
 	}, function(data, error)
-		self:handle_anki_fields_result(context, selected_token, data, error)
+		self:handle_anki_fields_result(context, export_token, data, error)
 	end, effective_expr, effective_reading)
 end
 
@@ -360,21 +402,33 @@ function Handler:handle_anki_fields_result(context, selected_token, data, error)
 		return Player.notify("Error: No dictionary entry.", "warn", 2)
 	end
 
+	-- Store data in context for later use in perform_anki_save
+	context.entry_data = entry
+	context.raw_data = data
+
 	-- Inject selection if Yomitan marker is missing
 	if self.last_selection and (not entry["popup-selection-text"] or entry["popup-selection-text"] == "") then
 		entry["popup-selection-text"] = self.last_selection
 	end
 
-	local markers_found = {}
-	for k, _ in pairs(entry) do
-		table.insert(markers_found, k)
-	end
-	msg.info("Available Yomitan markers in entry: " .. table.concat(markers_found, ", "))
-
 	Player.notify("Yomitan: Capturing media...")
+
+	-- Prepare parallel task orchestration
+	local tasks_pending = 2 -- Capture jobs (via capture_media callback) + save_yomitan_media
+	local note_fields = {}
+	local furigana_done = false
+
+	local function check_completion()
+		if tasks_pending == 0 and furigana_done then
+			self:perform_anki_save(context, note_fields)
+		end
+	end
+
+	-- Start Anki media path retrieval and local extraction
 	self.deps.anki:get_media_path(function(media_dir, media_err)
 		if media_err or not media_dir or media_dir == "" then
 			msg.error("Anki media path error: " .. tostring(media_err))
+			tasks_pending = -1 -- Abort
 			return Player.notify("Error: Cannot access Anki media folder.", "error", 4)
 		end
 
@@ -382,38 +436,71 @@ function Handler:handle_anki_fields_result(context, selected_token, data, error)
 		local picture = self.deps.media.picture.create_job(context.sub)
 		local audio = self.deps.media.audio.create_job(context.sub)
 
-		self:capture_media(context, entry, data, picture, audio, selected_token)
+		self:capture_media(context, entry, picture, audio, selected_token, function(extracted_fields)
+			for k, v in pairs(extracted_fields) do
+				note_fields[k] = v
+			end
+			tasks_pending = tasks_pending - 1
+			check_completion()
+		end)
 	end)
+
+	-- Start dictionary media ingestion in parallel
+	self:save_yomitan_media(data, function()
+		tasks_pending = tasks_pending - 1
+		check_completion()
+	end)
+
+	-- Prepare furigana in parallel
+	local sentence_furigana = get_field_value(entry, "sentence-furigana")
+	local furigana_key = self.config.sentence_furigana_field
+
+	local function on_furigana_ready(furigana_html)
+		if not Collections.is_void(furigana_key) then
+			note_fields[furigana_key] = string.format(self.config.primary_sentence_wrapper, furigana_html or "")
+		end
+		furigana_done = true
+		check_completion()
+	end
+
+	if Collections.is_void(furigana_key) then
+		on_furigana_ready(nil)
+	elseif context.expansion_occurred or Collections.is_void(sentence_furigana) then
+		self.deps.yomitan:get_sentence_furigana(context.current_subtitle_text, on_furigana_ready, context.raw_content)
+	else
+		on_furigana_ready(sentence_furigana)
+	end
 end
 
-function Handler:capture_media(context, entry, data, picture, audio, selected_token)
+function Handler:capture_media(context, entry, picture, audio, selected_token, on_finish)
 	msg.info("Starting media jobs")
 
-	local media_counter = Counter.new(2):on_finish(function()
-		self:process_note_content(context, entry, data, picture, audio, selected_token)
+	local extraction_counter = Counter.new(2):on_finish(function()
+		local note_fields = self:process_note_content(context, entry, picture, audio, selected_token)
+		on_finish(note_fields)
 	end)
 
 	local function on_job_finish(success)
 		if not success then
 			msg.warn("A media job failed, but proceeding")
 		end
-		media_counter:decrease()
+		extraction_counter:decrease()
 	end
 
 	if picture then
 		picture:on_finish(on_job_finish):run()
 	else
-		media_counter:decrease()
+		extraction_counter:decrease()
 	end
 
 	if audio then
 		audio:on_finish(on_job_finish):run()
 	else
-		media_counter:decrease()
+		extraction_counter:decrease()
 	end
 end
 
-function Handler:process_note_content(context, entry, data, picture, audio, selected_token)
+function Handler:process_note_content(context, entry, picture, audio, selected_token)
 	local note_fields = self.deps.builder:construct_note_fields(
 		context.sub.secondary_sid,
 		picture and picture.target_file,
@@ -446,23 +533,35 @@ function Handler:process_note_content(context, entry, data, picture, audio, sele
 			target_start, target_end = cloze_body:find(hint, 1, true)
 		end
 
-		if not target_start and not Collections.is_void(expression) then
-			local stem = ""
-			for i = 1, #expression do
-				local prefix = expression:sub(1, i)
-				local s, _ = cloze_body:find(prefix, 1, true)
-				if s then
-					stem = prefix
-				else
-					break
+		if not target_start then
+			-- Find longest shared prefix using UTF-8 codepoints to avoid splitting multi-byte characters
+			local function utf8_stem_search(ref, body)
+				if Collections.is_void(ref) or Collections.is_void(body) then
+					return nil, nil
 				end
+				local best_stem = ""
+				for next_i, _ in StringOps.utf8_codes(ref) do
+					local prefix = ref:sub(1, next_i - 1)
+					local s = body:find(prefix, 1, true)
+					if s then
+						best_stem = prefix
+					else
+						break
+					end
+				end
+				if #best_stem > 0 then
+					local s, _ = body:find(best_stem, 1, true)
+					if s then
+						return s, #body
+					end
+				end
+				return nil, nil
 			end
 
-			if #stem > 0 then
-				target_start, target_end = cloze_body:find(stem, 1, true)
-				if target_start then
-					target_end = #cloze_body
-				end
+			-- Match conjugated forms by trying both expression and reading stems
+			target_start, target_end = utf8_stem_search(expression, cloze_body)
+			if not target_start then
+				target_start, target_end = utf8_stem_search(hint, cloze_body)
 			end
 		end
 
@@ -478,36 +577,7 @@ function Handler:process_note_content(context, entry, data, picture, audio, sele
 			format_sentence_html(self, cloze_prefix, cloze_body, cloze_suffix, self.config.sentence_highlight_tag)
 	end
 
-	local sentence_furigana = get_field_value(entry, "sentence-furigana")
-	local furigana_key = self.config.sentence_furigana_field
-
-	if Collections.is_void(furigana_key) then
-		self:finalize_and_save_note(context, note_fields, entry, data)
-	elseif context.expansion_occurred or Collections.is_void(sentence_furigana) then
-		-- Fetch furigana directly if expansion occurred to ensure context consistency
-		self.deps.yomitan:get_sentence_furigana(context.current_subtitle_text, function(furigana_html)
-			note_fields[furigana_key] = string.format(self.config.primary_sentence_wrapper, furigana_html or "")
-			self:finalize_and_save_note(context, note_fields, entry, data)
-		end, context.raw_content)
-	else
-		note_fields[furigana_key] = string.format(self.config.primary_sentence_wrapper, sentence_furigana or "")
-		self:finalize_and_save_note(context, note_fields, entry, data)
-	end
-end
-
-function Handler:finalize_and_save_note(context, note_fields, entry, data)
-	-- Preference selected dictionary over manual selections
-	if self.selected_dictionary then
-		entry["selected-dict"] = self.selected_dictionary
-		entry["popup-selection-text"] = nil
-	end
-
-	self:apply_yomitan_fields(note_fields, entry)
-
-	Player.notify("Yomitan: Saving media...")
-	self:save_yomitan_media(data, function()
-		self:perform_anki_save(context, note_fields)
-	end)
+	return note_fields
 end
 
 function Handler:apply_yomitan_fields(note_fields, entry)
@@ -571,7 +641,6 @@ function Handler:apply_yomitan_fields(note_fields, entry)
 	process_handlebars(self.config.glossary_handlebar, self.config.glossary_field)
 	process_handlebars(self.config.selection_text_handlebar, self.config.selection_text_field)
 
-	-- Handle expression audio if present
 	if entry.audio and not Collections.is_void(self.config.expression_audio_field) then
 		note_fields[self.config.expression_audio_field] = entry.audio
 	end
@@ -770,6 +839,8 @@ function Handler:build_selector_style(update_range_fn, was_paused)
 			Curl.post("http://127.0.0.1:19634", json_body, function() end)
 		end,
 		on_hide = function()
+			self.pending_lookup_term = nil
+			self.pending_lookup_reading = nil
 			mp.command_native_async({
 				name = "subprocess",
 				playback_only = false,
@@ -1005,7 +1076,14 @@ function Handler:apply_manual_range(context)
 	self:refresh_timing_overlay(effective_start, effective_end)
 end
 
-function Handler:perform_anki_save(_context, note_fields)
+function Handler:perform_anki_save(context, note_fields)
+	local entry = context.entry_data
+	if self.selected_dictionary then
+		entry["selected-dict"] = self.selected_dictionary
+		entry["popup-selection-text"] = nil
+	end
+
+	self:apply_yomitan_fields(note_fields, entry)
 	Player.notify("Yomitan: Saving to Anki...")
 
 	self.deps.anki:add_note(

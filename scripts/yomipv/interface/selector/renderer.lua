@@ -64,7 +64,6 @@ function Renderer.render(selector)
 		or mp.get_property_number("sub-pos", 100)
 	local sub_bold = selector.style.bold ~= nil and selector.style.bold or mp.get_property_bool("sub-bold", true)
 
-	-- Color extraction
 	local border_size = (selector.style.border_size or mp.get_property_number("sub-border-size", 2)) * scale_factor
 	local shadow_offset = (selector.style.shadow_offset or mp.get_property_number("sub-shadow-offset", 0))
 		* scale_factor
@@ -74,7 +73,6 @@ function Renderer.render(selector)
 		Display.fix_color(selector.style.shadow_color or mp.get_property("sub-shadow-color", "000000"), "000000")
 	local main_color = Display.fix_color(selector.style.color or mp.get_property("sub-color", "FFFFFF"), "FFFFFF")
 
-	-- Measure actual line spacing
 	local function get_line_spacing()
 		measure_overlay.res_x = ow
 		measure_overlay.res_y = oh
@@ -91,7 +89,6 @@ function Renderer.render(selector)
 	end
 	local line_height = get_line_spacing()
 
-	-- Line preparation
 	local lines = {}
 	local current_line = { tokens = {}, width = 0 }
 	table.insert(lines, current_line)
@@ -108,8 +105,7 @@ function Renderer.render(selector)
 			if segment_text ~= "" then
 				local tw = Renderer.measure_width(segment_text, font_size, font_name, sub_bold)
 
-				-- Check auto-wrap
-				if current_line.width > 0 and current_line.width + tw > max_width then
+							if current_line.width > 0 and current_line.width + tw > max_width then
 					current_line = { tokens = {}, width = 0 }
 					table.insert(lines, current_line)
 				end
@@ -122,19 +118,16 @@ function Renderer.render(selector)
 				break
 			end
 
-			-- Explicit newline
-			current_line = { tokens = {}, width = 0 }
+				current_line = { tokens = {}, width = 0 }
 			table.insert(lines, current_line)
 			search_pos = next_nl + 1
 		end
 	end
 
-	-- Removes trailing empty lines
 	while #lines > 1 and #lines[#lines].tokens == 0 do
 		table.remove(lines)
 	end
 
-	-- Hitboxes & ASS assembly
 	selector.token_boxes = {}
 	local margin_y = math.floor(sub_margin_y * scale_factor)
 	local y_base = math.floor((oh * sub_pos / 100) - margin_y)
@@ -144,7 +137,6 @@ function Renderer.render(selector)
 	osd:font(font_name)
 	local global_bold = sub_bold and "\\b1" or "\\b0"
 
-	-- Base style for text block
 	osd:append(
 		string.format(
 			"{\\an2\\pos(%d,%d)\\q2\\bord%g\\shad%g\\3c&H%s&\\4c&H%s&\\1c&H%s&%s}",
@@ -164,10 +156,12 @@ function Renderer.render(selector)
 		local current_x = (ow / 2) - (line.width / 2)
 
 		for _, t_seg in ipairs(line.tokens) do
-			local is_selected = (
-				t_seg.index >= selector.index and t_seg.index < selector.index + selector.selection_len
-			)
-			local is_hovered = (selector.index == t_seg.index and selector.mora_index)
+			local is_selected = (t_seg.index >= selector.index and t_seg.index < selector.index + selector.selection_len)
+			local is_first = (t_seg.index == selector.index)
+			local is_last = (t_seg.index == selector.index + selector.selection_len - 1)
+			local has_front_slice = is_first and selector.mora_index
+			local has_back_slice = is_last and selector.tail_mora_index
+			local is_partially_selected = is_selected and (has_front_slice or has_back_slice)
 
 			local is_locked = (
 				selector.lookup_locked
@@ -178,34 +172,45 @@ function Renderer.render(selector)
 				)
 			)
 
-			if is_selected and not is_hovered and not is_locked then
-				local sel_color = Display.fix_color(selector.style.selection_color or "00FFFF", "00FFFF")
-				osd:append(string.format("{\\1c&H%s&}", sel_color))
-			end
+			if is_partially_selected then
+				local start_char = has_front_slice and selector.mora_index or 1
+				local end_char = nil
+				if has_back_slice then
+					if has_front_slice and selector.mora_index and selector.mora_index > 1 then
+						end_char = selector.mora_index + selector.tail_mora_index - 1
+					else
+						end_char = selector.tail_mora_index
+					end
+				end
 
-			if is_locked and not is_hovered then
-				local lock_color = Display.fix_color(selector.style.selector_lock_color or "FFD700", "FFD700")
-				osd:append(string.format("{\\1c&H%s&}", lock_color))
-			end
-
-			if is_hovered then
 				local term = t_seg.visual_text
-				local byte_pos = selector.get_mora_byte_pos(term, selector.mora_index)
-
-				local prefix = term:sub(1, byte_pos - 1)
-				local suffix = term:sub(byte_pos)
+				local start_byte = selector.get_mora_byte_pos(term, start_char)
+				local end_byte = end_char and selector.get_mora_byte_pos(term, end_char + 1) or (#term + 1)
+				local prefix = term:sub(1, start_byte - 1)
+				local colored = term:sub(start_byte, end_byte - 1)
+				local suffix = term:sub(end_byte)
 				local sel_color = Display.fix_color(selector.style.selection_color or "00FFFF", "00FFFF")
 
-				osd:append(prefix)
-				osd:append(string.format("{\\1c&H%s&}", sel_color))
-				osd:append(suffix)
-				osd:append(string.format("{\\1c&H%s&}", main_color))
+				if prefix ~= "" then osd:append(prefix) end
+				if colored ~= "" then osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", sel_color, colored, main_color)) end
+				if suffix ~= "" then osd:append(suffix) end
+			elseif is_selected then
+				local sel_color = Display.fix_color(selector.style.selection_color or "00FFFF", "00FFFF")
+				osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", sel_color, t_seg.visual_text, main_color))
+			elseif is_locked then
+				local lock_color = Display.fix_color(selector.style.selector_lock_color or "FFD700", "FFD700")
+				if selector.locked_mora_index and selector.locked_mora_index > 1 then
+					local term = t_seg.visual_text
+					local start_byte = selector.get_mora_byte_pos(term, selector.locked_mora_index)
+					local prefix = term:sub(1, start_byte - 1)
+					local colored = term:sub(start_byte)
+					if prefix ~= "" then osd:append(prefix) end
+					if colored ~= "" then osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", lock_color, colored, main_color)) end
+				else
+					osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", lock_color, t_seg.visual_text, main_color))
+				end
 			else
 				osd:append(t_seg.visual_text)
-			end
-
-			if (is_selected or is_locked) and not is_hovered then
-				osd:append(string.format("{\\1c&H%s&}", main_color))
 			end
 
 			table.insert(selector.token_boxes, {

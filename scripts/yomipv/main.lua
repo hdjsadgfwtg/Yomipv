@@ -70,6 +70,10 @@ Observer.start()
 SecondarySid.init(config)
 SubtitleFilter.init(config)
 
+mp.register_event("file-loaded", function()
+	yomitan:clear_cache()
+end)
+
 local function launch_lookup_app()
 	local app_path = config.lookup_app_path
 	if not app_path or app_path == "" then
@@ -279,6 +283,9 @@ end)
 mp.register_script_message("yomipv-active-entry", function(expression, reading)
 	msg.info("Active entry: " .. tostring(expression) .. " / " .. tostring(reading))
 	handler:set_active_entry(expression, reading)
+	if handler.deps.selector and handler.deps.selector.active then
+		handler.deps.selector:expand_selection_to_match(expression, reading)
+	end
 end)
 
 msg.info("Yomipv v" .. yomipv_version .. ": Initialized")

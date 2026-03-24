@@ -13,6 +13,8 @@ function Yomitan.new(config, curl)
 	local obj = {
 		config = config,
 		curl = curl,
+		_tokenize_cache = {},
+		_tokenize_cache_keys = {},
 	}
 	setmetatable(obj, Yomitan)
 	Yomitan.__index = Yomitan
@@ -22,6 +24,12 @@ end
 local function count_utf8_chars(text)
 	local _, char_count = text:gsub("[^\128-\191]", "")
 	return char_count
+end
+
+function Yomitan:clear_cache()
+	msg.info("Yomitan: Clearing tokenization cache")
+	self._tokenize_cache = {}
+	self._tokenize_cache_keys = {}
 end
 
 local function is_katakana_only(s)
@@ -201,9 +209,18 @@ end
 function Yomitan:tokenize(text, callback, scan_length)
 	msg.info("yomitan.tokenize called for: " .. tostring(text))
 
+	local sl = scan_length or DEFAULT_SCAN_LENGTH
+	local cache_key = tostring(text) .. "_" .. tostring(sl)
+
+	if self._tokenize_cache[cache_key] then
+		msg.info("yomitan.tokenize using cached result for: " .. tostring(text))
+		local entry = self._tokenize_cache[cache_key]
+		return callback(entry.tokens, entry.content)
+	end
+
 	local params = {
 		text = text,
-		scanLength = scan_length or DEFAULT_SCAN_LENGTH,
+		scanLength = sl,
 	}
 
 	self:request("/tokenize", params, function(curl_output)
@@ -214,7 +231,20 @@ function Yomitan:tokenize(text, callback, scan_length)
 			return callback(nil, nil, "Tokenization failed")
 		end
 
-		callback(build_tokens_from_content(content), content)
+		local tokens = build_tokens_from_content(content)
+
+		if #self._tokenize_cache_keys >= 100 then
+			local oldest = table.remove(self._tokenize_cache_keys, 1)
+			self._tokenize_cache[oldest] = nil
+		end
+
+		table.insert(self._tokenize_cache_keys, cache_key)
+		self._tokenize_cache[cache_key] = {
+			tokens = tokens,
+			content = content,
+		}
+
+		callback(tokens, content)
 	end)
 end
 
