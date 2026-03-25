@@ -122,21 +122,59 @@ function StringOps.clean_title(title, path)
 	-- Replace underscores with spaces
 	s = s:gsub("_", " ")
 
-	-- Strip extension if it looks like a filename
-	if s:match("%.%w+$") then
-		s = s:gsub("%.%w+$", "")
-	end
+	-- Strip extension once at the start
+	s = s:gsub("%.%w+$", "")
 
 	-- Strip brackets
 	for _, pattern in ipairs(BRACKET_PATTERNS) do
 		s = s:gsub(pattern, "")
 	end
 
-	-- Strip season/episode tags
-	for _, pattern in ipairs(TITLE_CLEAN_PATTERNS) do
-		s = s:gsub(pattern, "")
+	-- Normalize spacing and trim
+	s = StringOps.trim(StringOps.normalize_spacing(s))
+
+	-- Strip common quality/codec tags
+	local tags = {
+		"1080[pP]", "720[pP]", "480[pP]",
+		"[xX]26[45]", "[hH]%.?26[45]", "[hH][eE][vV][cC]",
+		"[aA][cC]3", "[aA][aA][cC]", "[mM][pP]3", "[fF][lL][aA][cC][0-9%.]*",
+		"[dD][dD][pP][0-9%.]*", "[hH][iI]10[pP]?",
+		"[nN][fF]", "[wW][eE][bB]%-?[dD][lL]", "[bB][lL][uU]%-?[rR][aA][yY]",
+		"[mM][uU][lL][tT][iI][^%s%.%-_]*", "[mM][sS][uU][bB][sS]?", "[dD][uU][aA][lL]",
+		"[yY][uU][rR][aA][sS][uU][kK][aA]", "[tT][oO][oO][nN][sS][hH][uU][bB]",
+		"[0-9]+%-[bB][iI][tT]"
+	}
+
+	for _, tag in ipairs(tags) do
+		s = s:gsub("[%s%.%-_]" .. tag .. "[%s%.%-_]", " ")
+		s = s:gsub("[%s%.%-_]" .. tag .. "$", "")
+		s = s:gsub("^" .. tag .. "[%s%.%-_]", "")
 	end
 
+	-- Strip episode separators and numbers
+	s = s:gsub("[%s%.%-_]+[0-9]+[vV][0-9]+$", "") -- 01v2
+	s = s:gsub("[%s%.%-_]+[0-9]+$", "")
+
+	-- Strip season/episode tags
+	for _, pattern in ipairs(TITLE_CLEAN_PATTERNS) do
+		if pattern ~= "%.%w+$" then
+			s = s:gsub(pattern, "")
+		end
+	end
+
+	-- Strip version tags
+	s = s:gsub("[vV][0-9]+$", "")
+	s = s:gsub("[ _%-][Vv][0-9]+", "")
+
+	-- Strip years (19xx, 20xx)
+	s = s:gsub("[%s%.%-_][12][0-9][0-9][0-9][%s%.%-_]", " ")
+	s = s:gsub("[%s%.%-_][12][0-9][0-9][0-9]$", "")
+
+	-- Strip trailing punctuation and delimiters
+	s = s:gsub("[%s%-%:_%.]+$", "")
+
+	-- Replace dots with spaces and normalize
+	s = s:gsub("%.", " ")
 	return StringOps.trim(StringOps.normalize_spacing(s))
 end
 
