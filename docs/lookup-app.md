@@ -41,6 +41,6 @@ You can also start a new search directly from the lookup window header:
 - By default the lookup app will show the frequencies of the word you are looking up.
 - You can disable this by setting `lookup_show_frequencies` to `no` in your `yomipv.conf` file.
 
-## Ptich Accents
+## Pitch Accents
 - By default, the Lookup App shows the pitch accents (if available) of the word you are looking up and also colors the word according to its pitch accent.
 - TODO: Add option to disable this.
