@@ -152,6 +152,7 @@ local default_options = {
 	selector_mora_hover = true, -- Lookup sub-words while hovering individual characters
 	selector_mora_navigation = false, -- Navigate through individual characters with arrow keys
 	lookup_show_frequencies = true,
+	prioritize_kanji_match = false, -- Prioritize entries with Kanji over match length
 
 	-- Typography
 	selector_font_name = "", -- Fallback to mpv sub-font if unset
@@ -182,8 +183,6 @@ local default_options = {
 	key_toggle_picture_animated = "g",
 	key_expand_prev = "Shift+LEFT",
 	key_expand_next = "Shift+RIGHT",
-	key_selection_next = "Ctrl+RIGHT",
-	key_selection_prev = "Ctrl+LEFT",
 	key_selector_lookup = "Ctrl+c",
 	key_toggle_mora_navigation = "s",
 	key_toggle_selector_trigger_on_mouse_move = "z",

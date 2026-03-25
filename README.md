@@ -48,10 +48,6 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 - **Append Mode (`Shift+C`)**: Select multiple subtitle lines before exporting
   - Press `Shift+C` to enter append mode, `c` to start the word selector, or `Shift+C` again to cancel
 
-- **Selection Expansion**:
-  - **`Ctrl+Left`** / **`Ctrl+Right`**: Expand selection to adjacent words
-  - **`Shift+Left`** / **`Shift+Right`**: Expand to previous/next subtitle line
-
 - **Mora-level Navigation**:
   - When `selector_mora_hover` is enabled, hovering over a word narrows the lookup to start from mora under your cursor instead of the full word
   - **`s`**: Toggle mora-level keyboard navigation (left/right moves by mora instead of word)

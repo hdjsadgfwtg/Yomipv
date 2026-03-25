@@ -316,16 +316,26 @@ function Yomitan:get_anki_fields(term, markers, context, callback, active_expres
 
 				-- Katakana priority
 				if term_is_katakana and expr == term then
-					score = score + 1000
+					score = score + 1000000
 				end
 
-				-- Kanji priority
-				if expr ~= reading then
-					score = score + 100
-				end
+				if not self.config.prioritize_kanji_match then
+					-- Length priority
+					score = score + (count_utf8_chars(expr) * 1000)
 
-				-- Fallback to length
-				score = score + count_utf8_chars(expr)
+					-- Kanji priority
+					if expr ~= reading then
+						score = score + 100
+					end
+				else
+					-- Kanji priority
+					if expr ~= reading then
+						score = score + 100
+					end
+
+					-- Fallback to length
+					score = score + count_utf8_chars(expr)
+				end
 
 				if score > best_score then
 					best_score = score

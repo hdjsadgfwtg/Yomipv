@@ -119,8 +119,6 @@ local function launch_lookup_app()
 			mp.set_property("input-ipc-server", ipc_pipe)
 		end
 
-		Player.notify("Yomipv: Starting lookup app...", "info")
-
 		local electron_ipc_pipe = ipc_pipe
 		if Platform.IS_WINDOWS and not electron_ipc_pipe:match("^\\\\.\\pipe\\") then
 			electron_ipc_pipe = "\\\\.\\pipe\\" .. electron_ipc_pipe

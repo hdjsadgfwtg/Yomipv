@@ -14,6 +14,7 @@ let currentShowFrequencies = false;
 let currentDictionaryMedia = [];
 let lookupHistory = [];
 let currentAbortController = null;
+let currentPrioritizeKanjiMatch = false;
 
 const filterDictionaryStyles = (styleEl, dictName) => {
   if (!styleEl || !styleEl.sheet || !styleEl.sheet.cssRules || styleEl.sheet.cssRules.length === 0) return '';
@@ -102,7 +103,7 @@ const renderHeader = (term, reading, frequencies) => {
       if (subTerm && subTerm !== cleanTerm) {
         console.log('[UI] Sending sync-selection for header click:', subTerm);
         ipcRenderer.send('sync-selection-hint', subTerm);
-        performLookup(subTerm, currentShowFrequencies);
+        performLookup(subTerm, currentShowFrequencies, false, currentPrioritizeKanjiMatch);
       }
     };
   });
@@ -112,7 +113,7 @@ const renderHeader = (term, reading, frequencies) => {
     e.preventDefault();
     if (lookupHistory.length > 0) {
       const prev = lookupHistory.pop();
-      performLookup(prev.term, prev.showFrequencies, true);
+      performLookup(prev.term, prev.showFrequencies, true, prev.prioritizeKanjiMatch);
     }
   };
 };
@@ -320,7 +321,7 @@ const sendSelectedDict = (el) => {
   ipcRenderer.send('dictionary-selected', dictContent);
 };
 
-const performLookup = async (term, showFrequencies, isBack = false) => {
+const performLookup = async (term, showFrequencies, isBack = false, prioritizeKanjiMatch) => {
   console.log('[UI] Performing lookup for:', term);
   
   const container = document.getElementById('lookup-container');
@@ -354,10 +355,11 @@ const performLookup = async (term, showFrequencies, isBack = false) => {
 
   // Save current term to history if not going back
   if (!isBack && currentTerm && currentTerm !== term) {
-    lookupHistory.push({ term: currentTerm, showFrequencies: currentShowFrequencies });
+    lookupHistory.push({ term: currentTerm, showFrequencies: currentShowFrequencies, prioritizeKanjiMatch: currentPrioritizeKanjiMatch });
   }
 
   currentShowFrequencies = showFrequencies || false;
+  currentPrioritizeKanjiMatch = prioritizeKanjiMatch !== undefined ? prioritizeKanjiMatch : false;
 
   // Show transition screen only for non-subword transitions
   if (!isSubword) {
@@ -458,16 +460,30 @@ const performLookup = async (term, showFrequencies, isBack = false) => {
         const exactB = exprB === term ? 1 : 0;
         if (exactA !== exactB) return exactB - exactA;
       }
-      
-      // Kanji priority
-      const kanjiA = (exprA && exprA !== fa.reading) ? 1 : 0;
-      const kanjiB = (exprB && exprB !== fb.reading) ? 1 : 0;
-      if (kanjiA !== kanjiB) return kanjiB - kanjiA;
 
-      // Fallback to length
-      const lenA = exprA.length;
-      const lenB = exprB.length;
-      return lenB - lenA;
+      if (!currentPrioritizeKanjiMatch) {
+         // Length priority
+         const lenA = exprA.length;
+         const lenB = exprB.length;
+         if (lenA !== lenB) return lenB - lenA;
+         
+         // Kanji priority
+         const kanjiA = (exprA && exprA !== fa.reading) ? 1 : 0;
+         const kanjiB = (exprB && exprB !== fb.reading) ? 1 : 0;
+         if (kanjiA !== kanjiB) return kanjiB - kanjiA;
+         
+         return 0;
+      } else {
+         // Kanji priority
+         const kanjiA = (exprA && exprA !== fa.reading) ? 1 : 0;
+         const kanjiB = (exprB && exprB !== fb.reading) ? 1 : 0;
+         if (kanjiA !== kanjiB) return kanjiB - kanjiA;
+
+         // Fallback to length
+         const lenA = exprA.length;
+         const lenB = exprB.length;
+         return lenB - lenA;
+      }
     });
 
     allEntries = sorted;
@@ -530,7 +546,7 @@ const performLookup = async (term, showFrequencies, isBack = false) => {
 ipcRenderer.on('lookup-term', async (event, data) => {
   console.log('[IPC] Received lookup data:', JSON.stringify(data));
   lookupHistory = [];
-  performLookup(data.term, data.showFrequencies);
+  performLookup(data.term, data.showFrequencies, false, data.prioritizeKanjiMatch);
 });
 
 ipcRenderer.on('window-hide-request', () => {

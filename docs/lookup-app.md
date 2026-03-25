@@ -13,6 +13,11 @@ The lookup window appears when you search for a word. Depending on your configur
 The window stays on top of MPV until the selector is confirmed or cancelled. 
 Right-click to lock the window, preventing accidental changes when the cursor moves over another word in the selector.
 
+### Result Sorting
+By default, the Lookup prioritizes the **longest match** first. This ensures that conjugated forms and compound words are shown before shorter matches (this mimics Yomitan's default behavior).
+
+If you prefer entries that contain Kanji to be prioritized over match length, you can set `prioritize_kanji_match` to `yes` in your `yomipv.conf` file.
+
 ### Navigating Multiple Results
 If a word has multiple entries, you will see a counter (like `1 / 3`) at the top.
 - Click the Left/Right buttons of the lookup window to cycle through different entries.
@@ -34,7 +39,7 @@ You can also start a new search directly from the lookup window header:
 
 ## Frequencies
 - By default the lookup app will show the frequencies of the word you are looking up.
-- You can disable this by setting `lookup_show_frequencies=no` in your `yomipv.conf` file.
+- You can disable this by setting `lookup_show_frequencies` to `no` in your `yomipv.conf` file.
 
 ## Ptich Accents
 - By default, the Lookup App shows the pitch accents (if available) of the word you are looking up and also colors the word according to its pitch accent.

@@ -164,7 +164,7 @@ end
 
 function Handler:initialize_export_context(gui)
 	Player.notify("Yomitan: Initializing...")
-	msg.info("Starting Yomitan export flow")
+	msg.info("Starting export flow")
 
 	if not self.deps.tracker.is_appending() then
 		self.deps.tracker.clear()
@@ -261,7 +261,7 @@ function Handler:start_selector_flow(context, was_paused)
 	end
 	msg.info("Final tokenize text hex: " .. hex_dump)
 	msg.info("Tokenizing subtitle: " .. context.current_subtitle_text)
-	Player.notify("Yomitan: Tokenizing...")
+	Player.notify("Tokenizing...")
 
 	self.expand_to_subtitle = function(_, target)
 		self:expand_to_subtitle_method(context, target)
@@ -296,7 +296,7 @@ function Handler:open_selector(context, tokens, was_paused)
 	end
 
 	msg.info("Starting selector with " .. #tokens .. " tokens")
-	Player.notify("Yomitan: Select word...")
+	Player.notify("Select word...")
 
 	local update_range_fn = function(direction)
 		self:update_range_async(context, direction)
@@ -411,7 +411,7 @@ function Handler:handle_anki_fields_result(context, selected_token, data, error)
 		entry["popup-selection-text"] = self.last_selection
 	end
 
-	Player.notify("Yomitan: Capturing media...")
+	Player.notify("Capturing media...")
 
 	-- Prepare parallel task orchestration
 	local tasks_pending = 2 -- Capture jobs (via capture_media callback) + save_yomitan_media
@@ -794,8 +794,6 @@ function Handler:build_selector_style(update_range_fn, was_paused)
 		key_down = self.config.key_selector_down,
 		key_expand_prev = self.config.key_expand_prev,
 		key_expand_next = self.config.key_expand_next,
-		key_selection_next = self.config.key_selection_next,
-		key_selection_prev = self.config.key_selection_prev,
 		key_lookup = self.config.key_selector_lookup,
 
 		navigation_delay = self.config.selector_navigation_delay,
@@ -834,6 +832,7 @@ function Handler:build_selector_style(update_range_fn, was_paused)
 				term = data.term,
 				reading = data.reading,
 				showFrequencies = self.config.lookup_show_frequencies,
+				prioritizeKanjiMatch = self.config.prioritize_kanji_match,
 			}
 			local json_body = require("mp.utils").format_json(data_to_send)
 			Curl.post("http://127.0.0.1:19634", json_body, function() end)
@@ -1084,7 +1083,7 @@ function Handler:perform_anki_save(context, note_fields)
 	end
 
 	self:apply_yomitan_fields(note_fields, entry)
-	Player.notify("Yomitan: Saving to Anki...")
+	Player.notify("Saving to Anki...")
 
 	self.deps.anki:add_note(
 		self.config.deck,
