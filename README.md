@@ -12,18 +12,18 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 - **[FFmpeg](https://ffmpeg.org/)** (Required for media extraction, falls back to MPV's internal encoder if not found)
 - **[Anki](https://apps.ankiweb.net/)** with **[AnkiConnect](https://ankiweb.net/shared/info/2055492159)**
 - **[Yomitan](https://yomitan.wiki/)** and **[Yomitan Api](https://github.com/yomidevs/yomitan-api)**
-- **[Node.js](https://nodejs.org/)** (Required for the lookup app)
-- **curl** (Usually pre-installed on Windows, used for API requests)
+- **curl** (Pre-installed on most systems, used for API requests)
+- **[Node.js](https://nodejs.org/)** (Only required if installing from source or contributing)
 
 ## Installation
 
-### Recommended
+### Recommended (No Node.js Required)
 1. Download the [Windows Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v0.2.1/win-yomipv-v0.2.1.zip) or [Linux Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v0.2.1/linux-yomipv-v0.2.1.zip).
 2. Extract the contents directly into your MPV directory:
     - Windows: `%APPDATA%/mpv/`
     - Linux: `~/.config/mpv/`
 
-### Alternative
+### Alternative (Requires Node.js)
 1. **Clone the repository** to your MPV directory and install dependencies **(make sure you have Node.js installed)**:
    - Windows: `%APPDATA%/mpv/`
      ```
@@ -81,8 +81,9 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 - **Auto-Updater (`U`)**: Keeps Yomipv updated to the latest version
   - Press **`U`** in MPV or open **`yomipv-updater.bat`** directly to trigger the update
   - Choose between official releases or latest source (main branch)
-  - Automatically preserves your user configuration in `script-opts/yomipv.conf`
-  - Updates dependencies for the Lookup App
+  - Automatically preserves user configuration in `script-opts/yomipv.conf`
+  - Downloads platform-specific binaries for the Lookup App
+  - (Source mode only) Updates dependencies for the Lookup App (requires Node.js)
   - Requires administrator privileges to run the PowerShell script on Windows
 
 ## Troubleshooting
@@ -91,6 +92,6 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 - Ensure PowerShell execution policy allows scripts
 - Check that curl is available at `C:\Windows\System32\curl.exe`
 
-> [!WARNING]
-> **Linux Support Not Tested**
-> This script has primarily been developed and tested on Windows. While cross-platform support is intended, Linux users may encounter issues. Please report any bugs or compatibility problems.
+### Linux
+- Ensure `curl`, `unzip`, `grep`, and `sed` are installed (usually available by default).
+- If the lookup app fails to open, ensure the `.AppImage` in `scripts/yomipv/` has execution permissions.
