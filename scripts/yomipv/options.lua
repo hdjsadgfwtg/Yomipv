@@ -233,6 +233,9 @@ local default_options = {
 	updater_enabled = true,
 	updater_use_source = false,
 	key_update = "U",
+
+	--[[ MPV Settings ]]
+	osd_messages = true, -- Show OSD messages
 }
 
 local options = default_options
