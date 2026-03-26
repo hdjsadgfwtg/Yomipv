@@ -860,12 +860,15 @@ end
 
 function Handler:build_yomitan_fields()
 	local fields = Collections.duplicate(DEFAULT_YOMITAN_FIELDS)
-	local client_side_handlebars = { ["selected-dict"] = true }
+	local client_side_handlebars = { ["selected-dict"] = true, ["selected-text"] = true }
+	local has_selected_dict = false
 
 	local definition_handlebars = parse_handlebars(self.config.definition_handlebar)
 	for _, handlebar in ipairs(definition_handlebars) do
 		if not client_side_handlebars[handlebar] then
 			table.insert(fields, handlebar)
+		else
+			has_selected_dict = true
 		end
 	end
 
@@ -873,6 +876,8 @@ function Handler:build_yomitan_fields()
 	for _, handlebar in ipairs(glossary_handlebars) do
 		if not client_side_handlebars[handlebar] then
 			table.insert(fields, handlebar)
+		else
+			has_selected_dict = true
 		end
 	end
 
@@ -881,6 +886,21 @@ function Handler:build_yomitan_fields()
 	for _, handlebar in ipairs(selection_handlebars) do
 		if not client_side_handlebars[handlebar] then
 			table.insert(fields, handlebar)
+		else
+			has_selected_dict = true
+		end
+	end
+
+	if has_selected_dict then
+		local has_glossary = false
+		for _, f in ipairs(fields) do
+			if f == "glossary" then
+				has_glossary = true
+				break
+			end
+		end
+		if not has_glossary then
+			table.insert(fields, "glossary")
 		end
 	end
 
@@ -1078,7 +1098,74 @@ end
 function Handler:perform_anki_save(context, note_fields)
 	local entry = context.entry_data
 	if self.selected_dictionary then
-		entry["selected-dict"] = self.selected_dictionary
+		local selected_dict = self.selected_dictionary
+
+		local glossary_html = context.raw_data and context.raw_data.fields and context.raw_data.fields["glossary"]
+
+		if glossary_html then
+			local function build_sigs(html)
+				local res = {}
+				local in_idx = 1
+				while true do
+					local s_idx, e_idx = html:find("yomitan_dictionary_media_[%w_%-%.]+", in_idx)
+					if not s_idx then break end
+
+					local url = html:sub(s_idx, e_idx)
+					local pre = html:sub(math.max(1, s_idx - 150), s_idx - 1)
+					local post = html:sub(e_idx + 1, math.min(#html, e_idx + 150))
+					
+					local d_space = html:sub(math.max(1, s_idx - 5000), s_idx)
+					local dict_name = d_space:match('.*data%-dictionary="([^"]+)"') or ""
+
+					pre = pre:gsub("<[^>]+>", ""):gsub("[%W_]", "")
+					pre = pre:sub(math.max(1, #pre - 40))
+
+					post = post:gsub("<[^>]+>", ""):gsub("[%W_]", "")
+					post = post:sub(1, math.min(#post, 40))
+
+					table.insert(res, { url = url, pre = pre, post = post, dict = dict_name })
+					in_idx = e_idx + 1
+				end
+				return res
+			end
+
+			local old_sigs = build_sigs(selected_dict)
+			local new_sigs = build_sigs(glossary_html)
+
+			local replacement_map = {}
+			for _, old_obj in ipairs(old_sigs) do
+				if not replacement_map[old_obj.url] then
+					local best_new_url = nil
+					local best_score = -1
+					local best_idx = nil
+
+					for idx, new_obj in ipairs(new_sigs) do
+						local score = 0
+						if old_obj.dict == new_obj.dict and #old_obj.dict > 0 then score = score + 50 end
+						if old_obj.pre == new_obj.pre and #old_obj.pre > 0 then score = score + 10 end
+						if old_obj.post == new_obj.post and #old_obj.post > 0 then score = score + 10 end
+
+						if score > best_score then
+							best_score = score
+							best_new_url = new_obj.url
+							best_idx = idx
+						end
+					end
+
+					if best_new_url and best_idx then
+						replacement_map[old_obj.url] = best_new_url
+						table.remove(new_sigs, best_idx)
+					end
+				end
+			end
+
+			local escape_magic = function(s) return (s:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%1")) end
+			for old_url, new_url in pairs(replacement_map) do
+				selected_dict = string.gsub(selected_dict, escape_magic(old_url), function() return new_url end)
+			end
+		end
+
+		entry["selected-dict"] = selected_dict
 		entry["popup-selection-text"] = nil
 	end
 
