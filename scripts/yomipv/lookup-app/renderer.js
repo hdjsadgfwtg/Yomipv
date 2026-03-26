@@ -446,37 +446,36 @@ const performLookup = async (term, showFrequencies, isBack = false, prioritizeKa
       return;
     }
 
+    const stripTags = (s) => s.replace(/<[^>]*>/g, '');
+
     const sorted = [...entries].sort((a, b) => {
       const fa = a.fields || a;
       const fb = b.fields || b;
-      
-      const exprA = fa.expression || '';
-      const exprB = fb.expression || '';
-      
-      // Katakana priority
-      const isKatakanaOnly = /^[\u30A0-\u30FF]+$/.test(term);
-      if (isKatakanaOnly) {
-        const exactA = exprA === term ? 1 : 0;
-        const exactB = exprB === term ? 1 : 0;
-        if (exactA !== exactB) return exactB - exactA;
-      }
+
+      const exprA = stripTags(fa.expression || '');
+      const exprB = stripTags(fb.expression || '');
+
+      // Exact match priority (for all terms, not just katakana)
+      const exactA = exprA === term ? 1 : 0;
+      const exactB = exprB === term ? 1 : 0;
+      if (exactA !== exactB) return exactB - exactA;
 
       if (!currentPrioritizeKanjiMatch) {
          // Length priority
          const lenA = exprA.length;
          const lenB = exprB.length;
          if (lenA !== lenB) return lenB - lenA;
-         
+
          // Kanji priority
-         const kanjiA = (exprA && exprA !== fa.reading) ? 1 : 0;
-         const kanjiB = (exprB && exprB !== fb.reading) ? 1 : 0;
+         const kanjiA = (exprA && exprA !== stripTags(fa.reading || '')) ? 1 : 0;
+         const kanjiB = (exprB && exprB !== stripTags(fb.reading || '')) ? 1 : 0;
          if (kanjiA !== kanjiB) return kanjiB - kanjiA;
-         
+
          return 0;
       } else {
          // Kanji priority
-         const kanjiA = (exprA && exprA !== fa.reading) ? 1 : 0;
-         const kanjiB = (exprB && exprB !== fb.reading) ? 1 : 0;
+         const kanjiA = (exprA && exprA !== stripTags(fa.reading || '')) ? 1 : 0;
+         const kanjiB = (exprB && exprB !== stripTags(fb.reading || '')) ? 1 : 0;
          if (kanjiA !== kanjiB) return kanjiB - kanjiA;
 
          // Fallback to length
