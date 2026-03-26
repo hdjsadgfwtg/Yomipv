@@ -20,6 +20,17 @@ jobs:
         with:
           node-version: 24
           
+      - name: Set Version
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          cd scripts/yomipv/lookup-app
+          npm version $VERSION --no-git-tag-version
+          cd ../../../
+          sed -i "s/yomipv_version = \".*\"/yomipv_version = \"$VERSION\"/" scripts/yomipv/main.lua
+          sed -i "s/v[0-9]\+\.[0-9]\+\.[0-9]\+/v$VERSION/g" README.md
+          
       - name: Install Dependencies
         working-directory: scripts/yomipv/lookup-app
         run: npm install
@@ -45,6 +56,16 @@ jobs:
         with:
           node-version: 24
           
+      - name: Set Version
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          cd scripts/yomipv/lookup-app
+          npm version $VERSION --no-git-tag-version
+          cd ../../../
+          sed -i "s/yomipv_version = \".*\"/yomipv_version = \"$VERSION\"/" scripts/yomipv/main.lua
+          sed -i "s/v[0-9]\+\.[0-9]\+\.[0-9]\+/v$VERSION/g" README.md
+          
       - name: Install Dependencies
         working-directory: scripts/yomipv/lookup-app
         run: npm install
@@ -69,6 +90,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          
+      - name: Set Version
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          cd scripts/yomipv/lookup-app
+          npm version $VERSION --no-git-tag-version
+          cd ../../../
+          sed -i "s/yomipv_version = \".*\"/yomipv_version = \"$VERSION\"/" scripts/yomipv/main.lua
+          sed -i "s/v[0-9]\+\.[0-9]\+\.[0-9]\+/v$VERSION/g" README.md
         
       - name: Download Windows Asset
         uses: actions/download-artifact@v4
@@ -139,3 +170,29 @@ jobs:
             linux-yomipv-${{ github.ref_name }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sync-version:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Main Branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          
+      - name: Set Version
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          cd scripts/yomipv/lookup-app
+          npm version $VERSION --no-git-tag-version
+          cd ../../../
+          sed -i "s/yomipv_version = \".*\"/yomipv_version = \"$VERSION\"/" scripts/yomipv/main.lua
+          sed -i "s/v[0-9]\+\.[0-9]\+\.[0-9]\+/v$VERSION/g" README.md
+          
+      - name: Commit and Push Version Bump
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "chore: bump version to ${{ github.ref_name }}" || echo "No changes to commit"
+          git push origin main
