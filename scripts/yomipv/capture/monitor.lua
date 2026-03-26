@@ -109,7 +109,15 @@ function Monitor.add_to_history(subtitle)
 
 	for i, entry in ipairs(Monitor.history) do
 		-- Match last entry
-		if math.abs(entry.start - subtitle.start) < 0.1 then
+		local is_exact = math.abs(entry.start - subtitle.start) < 0.1
+		local is_contained = false
+		if subtitle.start >= entry.start - 0.1 and subtitle["end"] <= (entry["end"] or 0) + 0.1 then
+			if normalize(entry.primary_sid):find(normalize(subtitle.primary_sid), 1, true) then
+				is_contained = true
+			end
+		end
+
+		if is_exact or is_contained then
 			if i == #Monitor.history then
 				overlap_entry = entry
 			else
@@ -151,7 +159,13 @@ function Monitor.add_to_history(subtitle)
 				if norm_existing_sec == "" then
 					overlap_entry.secondary_sid = secondary
 				elseif not norm_existing_sec:find(norm_new_sec, 1, true) then
-					overlap_entry.secondary_sid = overlap_entry.secondary_sid .. "\n" .. secondary
+					local to_append = ""
+					for sub_line in secondary:gmatch("[^\r\n]+") do
+						if not norm_existing_sec:find(normalize(sub_line), 1, true) then
+							to_append = to_append .. "\n" .. sub_line
+						end
+					end
+					overlap_entry.secondary_sid = overlap_entry.secondary_sid .. to_append
 					-- Extend duration
 					overlap_entry.secondary_end =
 						math.max(overlap_entry.secondary_end or 0, subtitle.secondary_end or 0)
@@ -171,7 +185,18 @@ function Monitor.add_to_history(subtitle)
 		-- Check for reappearing event
 		local prev_sec_start = previous_entry.secondary_start or -1
 		local curr_sec_start = subtitle.secondary_start or -1
-		local is_same_event = (math.abs(curr_sec_start - prev_sec_start) < 0.1) and (norm_prev == norm_curr)
+		local is_same_event = false
+		if math.abs(curr_sec_start - prev_sec_start) < 0.1 then
+			is_same_event = true
+		else
+			for sub_line in secondary:gmatch("[^\r\n]+") do
+				local n = normalize(sub_line)
+				if n ~= "" and norm_prev:find(n, 1, true) then
+					is_same_event = true
+					break
+				end
+			end
+		end
 
 		if is_same_event and has_secondary then
 			-- Calculate overlap duration
@@ -189,14 +214,25 @@ function Monitor.add_to_history(subtitle)
 
 			local overlap_ratio = overlap_duration / prim_duration
 
-			-- Merge if secondary persists
-			if overlap_ratio > 0.5 then
+			-- Merge if secondary persists significantly
+			if overlap_ratio > 0.3 or overlap_duration > 0.3 then
 				if Monitor.history_smart_merge then
 					local norm_existing = normalize(previous_entry.primary_sid)
 					local norm_new = normalize(primary)
 					if not norm_existing:find(norm_new, 1, true) then
 						previous_entry.primary_sid = previous_entry.primary_sid .. "\n" .. primary
 					end
+					
+					local to_append = ""
+					local norm_existing_sec = normalize(previous_entry.secondary_sid)
+					for sub_line in secondary:gmatch("[^\r\n]+") do
+						if not norm_existing_sec:find(normalize(sub_line), 1, true) then
+							to_append = to_append .. "\n" .. sub_line
+						end
+					end
+					previous_entry.secondary_sid = previous_entry.secondary_sid .. to_append
+					previous_entry.secondary_end = math.max(previous_entry.secondary_end or 0, subtitle.secondary_end or 0)
+					
 					previous_entry["end"] = subtitle["end"] or previous_entry["end"]
 					return
 				end

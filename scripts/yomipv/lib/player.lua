@@ -2,6 +2,7 @@
 --[[ User-facing OSD notification interface. ]]
 
 local mp = require("mp")
+local options = require("options")
 
 local Player = {}
 
@@ -24,6 +25,11 @@ function Player.notify(message, type, duration)
 
 	type = type or "info"
 	duration = duration or DEFAULT_DURATION
+
+    -- Skip non-critical messages if disabled
+    if not options.osd_messages and (type == "info" or type == "success") then
+        return
+    end
 
 	local icon = ICONS[type] or ""
 	local display_text = icon ~= "" and (icon .. " " .. message) or message

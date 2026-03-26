@@ -78,6 +78,13 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 - **History Panel (`a`)**: Toggle subtitle history panel
   - Click on previous/next lines to select them to expand the subtitle lines (when selector is open) or seek to that timestamp (when selector is closed)
 
+- **Auto-Updater (`U`)**: Keeps Yomipv updated to the latest version
+  - Press **`U`** in MPV or open **`yomipv-updater.bat`** directly to trigger the update
+  - Choose between official releases or latest source (main branch)
+  - Automatically preserves your user configuration in `script-opts/yomipv.conf`
+  - Updates dependencies for the Lookup App
+  - Requires administrator privileges to run the PowerShell script on Windows
+
 ## Troubleshooting
 
 ### Windows

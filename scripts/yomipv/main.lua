@@ -251,6 +251,47 @@ if config.key_clear_timings ~= "" then
 	end)
 end
 
+local function launch_updater()
+	if not config.updater_enabled then
+		return
+	end
+
+	local is_windows = package.config:sub(1,1) == "\\"
+	local root_dir = utils.join_path(script_dir, "../../")
+	local updater_path = utils.join_path(root_dir, "yomipv-updater.bat")
+
+	if is_windows then
+		updater_path = updater_path:gsub("/", "\\")
+	end
+
+	msg.info("Launching updater: " .. updater_path)
+	Player.notify("Checking for updates...", "info", 5)
+
+	local args = { "cmd.exe", "/c", updater_path }
+	if is_windows then
+		-- Use powershell to start the batch file as admin directly
+		args = { "powershell.exe", "-NoProfile", "-Command", "Start-Process", '"' .. updater_path .. '"', "-Verb", "RunAs" }
+	end
+
+	mp.command_native_async({
+		name = "subprocess",
+		playback_only = false,
+		detach = true,
+		args = args,
+	}, function(success, _result, err)
+		if not success then
+			msg.error("Failed to launch updater: " .. tostring(err))
+			Player.notify("Failed to launch updater", "error")
+		end
+	end)
+end
+
+if config.key_update ~= "" then
+	mp.add_key_binding(config.key_update, "yomipv-update", function()
+		launch_updater()
+	end)
+end
+
 if config.key_sub_seek_next ~= "" then
 	mp.add_key_binding(config.key_sub_seek_next, "yomipv-sub-seek-next", function()
 		mp.commandv("sub-seek", "1")
