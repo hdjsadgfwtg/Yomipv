@@ -20,7 +20,7 @@ jobs:
       - name: Create Zip Archive
         run: |
           ZIP_NAME="yomipv-${{ github.ref_name }}.zip"
-          zip -r "$ZIP_NAME" docs script-opts scripts yomipv-updater.bat yomipv-updater.ps1 LICENSE README.md
+          zip -r "$ZIP_NAME" script-opts scripts yomipv-updater.bat yomipv-updater.ps1 LICENSE README.md
 
       - name: Prepare Release Body
         run: |
