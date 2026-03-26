@@ -1,0 +1,141 @@
+name: Release Yomipv
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          
+      - name: Install Dependencies
+        working-directory: scripts/yomipv/lookup-app
+        run: npm install
+        
+      - name: Build Windows Executable
+        working-directory: scripts/yomipv/lookup-app
+        run: npx electron-builder --win --x64 --publish never
+        
+      - name: Upload Windows Asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: yomipv-lookup-windows
+          path: scripts/yomipv/lookup-app/dist/*.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          
+      - name: Install Dependencies
+        working-directory: scripts/yomipv/lookup-app
+        run: npm install
+        
+      - name: Build Linux Binaries
+        working-directory: scripts/yomipv/lookup-app
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --linux --x64 --publish never
+        
+      - name: Upload Linux Asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: yomipv-lookup-linux
+          path: scripts/yomipv/lookup-app/dist/*.AppImage
+
+  create-release:
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+        
+      - name: Download Windows Asset
+        uses: actions/download-artifact@v4
+        with:
+          name: yomipv-lookup-windows
+          path: bin-win
+          
+      - name: Download Linux Asset
+        uses: actions/download-artifact@v4
+        with:
+          name: yomipv-lookup-linux
+          path: bin-linux
+          
+      - name: Create Zip Archive
+        run: |
+          mkdir release-bundle
+          cp -r docs scripts script-opts release-bundle/
+          cp README.md LICENSE release-bundle/ 2>/dev/null || true
+          cp yomipv-updater.* release-bundle/ 2>/dev/null || true
+          
+          rm -rf release-bundle/scripts/yomipv/lookup-app
+          
+          cp -r release-bundle win-bundle
+          cp bin-win/*.exe win-bundle/scripts/yomipv/ || true
+          cd win-bundle
+          zip -r ../win-yomipv-${{ github.ref_name }}.zip ./*
+          cd ..
+          
+          cp -r release-bundle linux-bundle
+          cp bin-linux/*.AppImage linux-bundle/scripts/yomipv/ || true
+          cd linux-bundle
+          zip -r ../linux-yomipv-${{ github.ref_name }}.zip ./*
+          cd ..
+          
+      - name: Generate Release Notes
+        run: |
+          git fetch --tags --force
+          
+          CURRENT_TAG=${{ github.ref_name }}
+          PREV_TAG=$(git describe --tags --abbrev=0 $CURRENT_TAG^ 2>/dev/null || echo "")
+          
+          if [ -n "$PREV_TAG" ]; then
+            CHANGELOG_LINK="https://github.com/BrenoAqua/Yomipv/compare/${PREV_TAG}...${CURRENT_TAG}"
+          else
+            CHANGELOG_LINK="https://github.com/BrenoAqua/Yomipv/commits/${CURRENT_TAG}"
+          fi
+          
+          cat <<EOF > release_body.md
+          **Full Changelog**: $CHANGELOG_LINK
+          
+          ---
+          
+          ### Installation
+          
+          1. Download the [Windows Zip](https://github.com/BrenoAqua/Yomipv/releases/download/${{ github.ref_name }}/win-yomipv-${{ github.ref_name }}.zip) or [Linux Zip](https://github.com/BrenoAqua/Yomipv/releases/download/${{ github.ref_name }}/linux-yomipv-${{ github.ref_name }}.zip).
+          2. Extract the contents directly into your MPV directory:
+              - Windows: \`%APPDATA%/mpv/\`
+              - Linux: \`~/.config/mpv/\`
+          EOF
+          
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Yomipv ${{ github.ref_name }}
+          body_path: release_body.md
+          files: |
+            win-yomipv-${{ github.ref_name }}.zip
+            linux-yomipv-${{ github.ref_name }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

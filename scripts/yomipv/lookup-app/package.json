@@ -1,11 +1,45 @@
 {
   "name": "yomipv-lookup",
   "version": "0.1.0",
+  "description": "Yomipv dictionary lookup app",
+  "author": "Breno Aqua",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BrenoAqua/Yomipv.git"
+  },
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder -mwl --x64"
   },
   "devDependencies": {
-    "electron": "^40.4.1"
+    "electron": "^40.4.1",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.yomipv.lookup",
+    "productName": "YomipvLookup",
+    "directories": {
+      "output": "dist"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "BrenoAqua",
+        "repo": "Yomipv"
+      }
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "build/lookup-app.png",
+      "artifactName": "${productName}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build/lookup-app.png",
+      "artifactName": "${productName}.${ext}"
+    }
   }
 }

@@ -2,6 +2,7 @@
 
 local mp = require("mp")
 local msg = require("mp.msg")
+local utils = require("mp.utils")
 
 local Platform = {}
 
@@ -75,6 +76,42 @@ end
 
 -- Launcher implementation for Electron frontend
 function Platform.launch_electron_app(app_path, mpv_pid, ipc_pipe, callback)
+	local binary_name = "YomipvLookup" .. Platform.get_binary_extension()
+	if Platform.IS_LINUX then
+		binary_name = "YomipvLookup.AppImage"
+	end
+
+	local root_dir = mp.get_script_directory() .. "/"
+	local binary_path = Platform.normalize_path(utils.join_path(root_dir, binary_name))
+
+	local function file_exists(name)
+		local f = io.open(name, "r")
+		if f ~= nil then
+			io.close(f)
+			return true
+		else
+			return false
+		end
+	end
+
+	if file_exists(binary_path) then
+		msg.info("Standalone binary found: " .. binary_path)
+
+		local args = { binary_path, "--parent-pid=" .. tostring(mpv_pid), "--ipc-pipe=" .. (ipc_pipe or "") }
+
+		msg.info("Starting standalone lookup app for PID: " .. tostring(mpv_pid))
+
+		return mp.command_native_async({
+			name = "subprocess",
+			playback_only = false,
+			detach = true,
+			args = args,
+		}, callback)
+	end
+
+	-- Fallback
+	msg.info("Standalone binary not found at " .. binary_path .. ", falling back to development mode")
+
 	local normalized_path = Platform.normalize_path(app_path)
 
 	if Platform.IS_WINDOWS then
