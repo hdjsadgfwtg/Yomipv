@@ -59,12 +59,15 @@ local function hide_if_needed(selector, trigger_source)
 		and selector.tokens[selector.index]
 		and selector.tokens[selector.index].is_term
 
-	if selector.style.on_hide and not will_trigger_lookup then
-		if selector.lookup_timer then
-			selector.lookup_timer:kill()
-			selector.lookup_timer = nil
+	if selector.style.on_hide then
+		local delay = selector.style.lookup_delay or 0.1
+		if not will_trigger_lookup or delay > 0 then
+			if selector.lookup_timer then
+				selector.lookup_timer:kill()
+				selector.lookup_timer = nil
+			end
+			selector.style.on_hide()
 		end
-		selector.style.on_hide()
 	end
 end
 
