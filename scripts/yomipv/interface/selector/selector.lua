@@ -189,8 +189,10 @@ function Selector:expand_selection_to_match(expression, reading)
 			end
 
 			-- Conjugation fallback: match all but final character
-			if (read_len >= 2 and shared_read >= read_len - 1) or
-			   (expr_len >= 2 and shared_expr >= expr_len - 1) then
+			-- Guard: only fire when enough morae have accumulated to represent a conjugated form
+			if combined_char_len >= expr_len and (
+			   (read_len >= 2 and shared_read >= read_len - 1) or
+			   (expr_len >= 2 and shared_expr >= expr_len - 1)) then
 				match_len = i + 1
 				tail_mora = nil
 				break
