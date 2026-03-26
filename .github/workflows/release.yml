@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create Zip Archive
+        run: |
+          ZIP_NAME="yomipv-${{ github.ref_name }}.zip"
+          zip -r "$ZIP_NAME" docs script-opts scripts yomipv-updater.bat yomipv-updater.ps1 LICENSE README.md
+
+      - name: Prepare Release Body
+        run: |
+          echo "" > release_body.md
+          echo "---" >> release_body.md
+          echo "" >> release_body.md
+          echo "### Installation" >> release_body.md
+          echo "1. Download the [Zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/yomipv-${{ github.ref_name }}.zip)." >> release_body.md
+          echo "2. Extract the contents directly into your MPV directory:" >> release_body.md
+          echo "    - Windows: \`%APPDATA%/mpv/\`" >> release_body.md
+          echo "    - Linux: \`~/.config/mpv/\`" >> release_body.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Yomipv ${{ github.ref_name }}
+          files: yomipv-${{ github.ref_name }}.zip
+          body_path: release_body.md
+          append_body: true
+          generate_release_notes: true
