@@ -26,7 +26,7 @@ jobs:
           VERSION=${GITHUB_REF_NAME#v}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           cd scripts/yomipv/lookup-app
-          npm version $VERSION --no-git-tag-version
+          npm version $VERSION --no-git-tag-version --allow-same-version
           cd ../../../
           sed -i "s/yomipv_version = \".*\"/yomipv_version = \"$VERSION\"/" scripts/yomipv/main.lua
           sed -i "s/v[0-9]\+\.[0-9]\+\.[0-9]\+/v$VERSION/g" README.md
@@ -61,7 +61,7 @@ jobs:
           VERSION=${GITHUB_REF_NAME#v}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           cd scripts/yomipv/lookup-app
-          npm version $VERSION --no-git-tag-version
+          npm version $VERSION --no-git-tag-version --allow-same-version
           cd ../../../
           sed -i "s/yomipv_version = \".*\"/yomipv_version = \"$VERSION\"/" scripts/yomipv/main.lua
           sed -i "s/v[0-9]\+\.[0-9]\+\.[0-9]\+/v$VERSION/g" README.md
@@ -96,7 +96,7 @@ jobs:
           VERSION=${GITHUB_REF_NAME#v}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           cd scripts/yomipv/lookup-app
-          npm version $VERSION --no-git-tag-version
+          npm version $VERSION --no-git-tag-version --allow-same-version
           cd ../../../
           sed -i "s/yomipv_version = \".*\"/yomipv_version = \"$VERSION\"/" scripts/yomipv/main.lua
           sed -i "s/v[0-9]\+\.[0-9]\+\.[0-9]\+/v$VERSION/g" README.md
@@ -184,7 +184,7 @@ jobs:
         run: |
           VERSION=${GITHUB_REF_NAME#v}
           cd scripts/yomipv/lookup-app
-          npm version $VERSION --no-git-tag-version
+          npm version $VERSION --no-git-tag-version --allow-same-version
           cd ../../../
           sed -i "s/yomipv_version = \".*\"/yomipv_version = \"$VERSION\"/" scripts/yomipv/main.lua
           sed -i "s/v[0-9]\+\.[0-9]\+\.[0-9]\+/v$VERSION/g" README.md
