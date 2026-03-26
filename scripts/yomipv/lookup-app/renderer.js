@@ -446,6 +446,8 @@ const performLookup = async (term, showFrequencies, isBack = false, prioritizeKa
       return;
     }
 
+    const stripTags = (s) => s.replace(/<[^>]*>/g, '');
+
     const sorted = [...entries].sort((a, b) => {
       const fa = a.fields || a;
       const fb = b.fields || b;
@@ -464,16 +466,18 @@ const performLookup = async (term, showFrequencies, isBack = false, prioritizeKa
          const lenB = exprB.length;
          if (lenA !== lenB) return lenB - lenA;
 
+
          // Kanji priority
-         const kanjiA = (exprA && exprA !== fa.reading) ? 1 : 0;
-         const kanjiB = (exprB && exprB !== fb.reading) ? 1 : 0;
+         const kanjiA = (exprA && exprA !== stripTags(fa.reading || '')) ? 1 : 0;
+         const kanjiB = (exprB && exprB !== stripTags(fb.reading || '')) ? 1 : 0;
          if (kanjiA !== kanjiB) return kanjiB - kanjiA;
+
 
          return 0;
       } else {
          // Kanji priority
-         const kanjiA = (exprA && exprA !== fa.reading) ? 1 : 0;
-         const kanjiB = (exprB && exprB !== fb.reading) ? 1 : 0;
+         const kanjiA = (exprA && exprA !== stripTags(fa.reading || '')) ? 1 : 0;
+         const kanjiB = (exprB && exprB !== stripTags(fb.reading || '')) ? 1 : 0;
          if (kanjiA !== kanjiB) return kanjiB - kanjiA;
 
          // Fallback to length
