@@ -115,21 +115,23 @@ jobs:
           
       - name: Create Zip Archive
         run: |
-          mkdir release-bundle
-          cp -r docs scripts script-opts release-bundle/
-          cp README.md LICENSE release-bundle/ 2>/dev/null || true
-          cp yomipv-updater.* release-bundle/ 2>/dev/null || true
+          mkdir common-bundle
+          cp -r docs scripts script-opts common-bundle/
+          cp README.md LICENSE common-bundle/ 2>/dev/null || true
+          rm -rf common-bundle/scripts/yomipv/lookup-app
           
-          rm -rf release-bundle/scripts/yomipv/lookup-app
-          
-          cp -r release-bundle win-bundle
+          # Create Windows bundle
+          cp -r common-bundle win-bundle
           cp bin-win/*.exe win-bundle/scripts/yomipv/ || true
+          cp yomipv-updater.ps1 yomipv-updater.bat win-bundle/ 2>/dev/null || true
           cd win-bundle
           zip -r ../win-yomipv-${{ github.ref_name }}.zip ./*
           cd ..
           
-          cp -r release-bundle linux-bundle
+          # Create Linux bundle
+          cp -r common-bundle linux-bundle
           cp bin-linux/*.AppImage linux-bundle/scripts/yomipv/ || true
+          cp yomipv-updater.sh linux-bundle/ 2>/dev/null || true
           cd linux-bundle
           zip -r ../linux-yomipv-${{ github.ref_name }}.zip ./*
           cd ..

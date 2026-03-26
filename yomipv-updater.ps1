@@ -232,9 +232,18 @@ function Update-Yomipv {
         $zip_url = $null
         if ($release.assets) {
             foreach ($asset in $release.assets) {
-                if ($asset.name -like "*.zip") {
+                if ($asset.name -like "win-yomipv-*.zip") {
                     $zip_url = $asset.browser_download_url
                     break
+                }
+            }
+            # Fallback
+            if (-not $zip_url) {
+                foreach ($asset in $release.assets) {
+                    if ($asset.name -like "*.zip" -and $asset.name -notlike "*linux*") {
+                        $zip_url = $asset.browser_download_url
+                        break
+                    }
                 }
             }
         }
