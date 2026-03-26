@@ -314,8 +314,8 @@ function Yomitan:get_anki_fields(term, markers, context, callback, active_expres
 				local expr = entry.expression or ""
 				local reading = entry.reading or ""
 
-				-- Katakana priority
-				if term_is_katakana and expr == term then
+				-- Exact match priority (for all terms)
+				if expr == term then
 					score = score + 1000000
 				end
 
