@@ -97,6 +97,16 @@ local function split_cloze(context, target, surface, offset)
 end
 
 local function format_sentence_html(self, prefix, body, suffix, tag)
+	local function sanitize_text(text)
+		if not text then
+			return ""
+		end
+		return text:gsub("sentence_highlight_tag=[^%s%p]*", ""):gsub("sentence_highlight_tag=", "")
+	end
+
+	local clean_prefix = sanitize_text(prefix)
+	local clean_suffix = sanitize_text(suffix)
+
 	local clean_tag = tag and tag:match("=(<.*)") or tag
 	if not clean_tag or clean_tag == "" then
 		clean_tag = "<b>"
@@ -105,7 +115,7 @@ local function format_sentence_html(self, prefix, body, suffix, tag)
 	local closing_tag = clean_tag:match("<([%w%-]+)")
 	closing_tag = closing_tag and ("</" .. closing_tag .. ">") or "</span>"
 	local content =
-		string.format("%s%s%s%s%s", prefix or "", clean_tag or "", body or "", closing_tag, suffix or "")
+		string.format("%s%s%s%s%s", clean_prefix, clean_tag, body or "", closing_tag, clean_suffix)
 	return string.format(self.config.primary_sentence_wrapper, content)
 end
 
