@@ -3,6 +3,7 @@
 local utils = require("mp.utils")
 local msg = require("mp.msg")
 
+local match_sort = require("api.match_sort")
 local DEFAULT_SCAN_LENGTH = 10
 local PUNCTUATION_PATTERN = "[%s%p。、？！（）「」『』〜➨]"
 local WHITESPACE_PATTERN = "[%z\1-\32\127]"
@@ -308,6 +309,7 @@ function Yomitan:get_anki_fields(term, markers, context, callback, active_expres
 
 		if not current_pinned then
 			local term_is_katakana = is_katakana_only(term)
+			local term_cps = match_sort.to_normalized_codepoints(term)
 
 			for _, entry in ipairs(fields_list) do
 				local score = 0
@@ -319,9 +321,11 @@ function Yomitan:get_anki_fields(term, markers, context, callback, active_expres
 					score = score + 1000000
 				end
 
+				local matched = match_sort.compute_matched_len(term_cps, expr, reading)
+
 				if not self.config.prioritize_kanji_match then
-					-- Length priority
-					score = score + (count_utf8_chars(expr) * 1000)
+					-- Matched-length priority (common prefix with term, kana-normalized)
+					score = score + (matched * 1000)
 
 					-- Kanji priority
 					if expr ~= reading then
@@ -333,8 +337,8 @@ function Yomitan:get_anki_fields(term, markers, context, callback, active_expres
 						score = score + 100
 					end
 
-					-- Fallback to length
-					score = score + count_utf8_chars(expr)
+					-- Fallback to matched length
+					score = score + matched
 				end
 
 				if score > best_score then

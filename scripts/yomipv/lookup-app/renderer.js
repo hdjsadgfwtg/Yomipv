@@ -1,4 +1,5 @@
 const { ipcRenderer } = require('electron');
+const { toNormalizedChars, computeMatchedLen } = require('./match-sort');
 
 const glossaryEl = document.getElementById('glossary-content');
 const headerEl = document.getElementById('term-header');
@@ -455,32 +456,41 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
       return;
     }
 
+    // Precompute matched lengths (avoid repeated work inside sort comparator)
+    const termChars = toNormalizedChars(term);
+    const isKatakanaOnly = /^[\u30A0-\u30FF]+$/.test(term);
+    const matchedLenMap = new Map();
+    for (const entry of entries) {
+      const f = entry.fields || entry;
+      matchedLenMap.set(entry, computeMatchedLen(termChars, f.expression || '', f.reading || ''));
+    }
+
     const sorted = [...entries].sort((a, b) => {
       const fa = a.fields || a;
       const fb = b.fields || b;
-      
+
       const exprA = fa.expression || '';
       const exprB = fb.expression || '';
-      
+
       // Katakana priority
-      const isKatakanaOnly = /^[\u30A0-\u30FF]+$/.test(term);
       if (isKatakanaOnly) {
         const exactA = exprA === term ? 1 : 0;
         const exactB = exprB === term ? 1 : 0;
         if (exactA !== exactB) return exactB - exactA;
       }
 
+      const lenA = matchedLenMap.get(a);
+      const lenB = matchedLenMap.get(b);
+
       if (!currentPrioritizeKanjiMatch) {
-         // Length priority
-         const lenA = exprA.length;
-         const lenB = exprB.length;
+         // Matched-length priority (common prefix with term, kana-normalized)
          if (lenA !== lenB) return lenB - lenA;
-         
+
          // Kanji priority
          const kanjiA = (exprA && exprA !== fa.reading) ? 1 : 0;
          const kanjiB = (exprB && exprB !== fb.reading) ? 1 : 0;
          if (kanjiA !== kanjiB) return kanjiB - kanjiA;
-         
+
          return 0;
       } else {
          // Kanji priority
@@ -488,9 +498,7 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
          const kanjiB = (exprB && exprB !== fb.reading) ? 1 : 0;
          if (kanjiA !== kanjiB) return kanjiB - kanjiA;
 
-         // Fallback to length
-         const lenA = exprA.length;
-         const lenB = exprB.length;
+         // Fallback to matched length
          return lenB - lenA;
       }
     });
