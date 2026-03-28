@@ -23,6 +23,7 @@ local SecondarySid = require("subtitle.secondary-sid")
 local Selector = require("interface.selector.selector")
 local History = require("interface.history.panel")
 local Builder = require("export.builder")
+local AnkiDBBuilder = require("export.anki_db_builder")
 local Formatter = require("export.formatter")
 local Handler = require("export.handler")
 local Picture = require("media.picture")
@@ -298,23 +299,7 @@ if config.key_update ~= "" then
 end
 
 local function launch_anki_db_build()
-	local script_path = Platform.normalize_path(utils.join_path(script_dir, "build_anki_db.py"))
-
-	-- Resolve script-opts relative to script directory
-	local output_path = utils.join_path(script_dir, "../../script-opts/anki_words.json")
-	local absolute_output_path = Platform.normalize_path(mp.command_native({ "expand-path", output_path }))
-	local url = "http://" .. config.ankiconnect_url
-
-	local progress_file = Platform.normalize_path(utils.join_path(Platform.get_temp_dir(), "yomipv_anki_db_progress.txt"))
-	local progress_timer = nil
-
-	local function clear_progress()
-		if progress_timer then
-			progress_timer:kill()
-			progress_timer = nil
-		end
-		pcall(os.remove, progress_file)
-	end
+	local db_builder = AnkiDBBuilder.new(config, anki)
 
 	local function draw_progress_bar(current, total)
 		local percent = math.floor((current / total) * 100)
@@ -324,38 +309,15 @@ local function launch_anki_db_build()
 		return string.format("Building Anki database... %s %d%%", bar, percent)
 	end
 
-	clear_progress()
-	progress_timer = mp.add_periodic_timer(0.2, function()
-		local f = io.open(progress_file, "r")
-		if f then
-			local content = f:read("*l")
-			f:close()
-			if content then
-				local cur, tot = content:match("(%d+)/(%d+)")
-				if cur and tot then
-					Player.notify(draw_progress_bar(tonumber(cur), tonumber(tot)), "info", 1)
-				end
-			end
-		end
-	end)
+	db_builder.on_progress = function(current, total)
+		Player.notify(draw_progress_bar(current, total), "info", 1)
+	end
 
-	msg.info("Building Anki database: " .. script_path)
+	msg.info("Building Anki database (Lua)...")
 	Player.notify("Building Anki database...", "info", 5)
 
-	local args = { "python", script_path, "--url", url, "--output", absolute_output_path, "--field" }
-	for field in config.ankidb_fields:gmatch("%S+") do
-		table.insert(args, field)
-	end
-	table.insert(args, "--progress-file")
-	table.insert(args, progress_file)
-
-	mp.command_native_async({
-		name = "subprocess",
-		playback_only = false,
-		args = args,
-	}, function(success, result, err)
-		clear_progress()
-		if success and result.status == 0 then
+	db_builder:build(function(success, err)
+		if success then
 			msg.info("Anki database built successfully")
 			Player.notify("Anki database built successfully", "success")
 			-- Reload database in memory
@@ -368,9 +330,6 @@ local function launch_anki_db_build()
 			end
 		else
 			local error_msg = "Failed to build Anki database"
-			if result and result.status ~= 0 then
-				error_msg = error_msg .. " (status " .. result.status .. ")"
-			end
 			msg.error(error_msg .. ": " .. tostring(err))
 			Player.notify(error_msg, "error")
 		end
