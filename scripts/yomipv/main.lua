@@ -257,6 +257,52 @@ if config.key_clear_timings ~= "" then
 	end)
 end
 
+local function version_to_number(v)
+	if not v then return 0 end
+	local v_clean = v:gsub("^v", "")
+	local major, minor, patch = v_clean:match("(%d+)%.(%d+)%.(%d+)")
+	if major and minor and patch then
+		return tonumber(major) * 1000000 + tonumber(minor) * 1000 + tonumber(patch)
+	end
+	return 0
+end
+
+local function check_for_updates()
+	if not config.updater_enabled or not config.updater_check_on_startup then
+		return
+	end
+
+	msg.info("Checking for updates in background...")
+	local api_url = "https://api.github.com/repos/BrenoAqua/Yomipv/releases/latest"
+
+	Curl.get(api_url, function(success, output, err)
+		if not success or not output or output.status ~= 0 then
+			msg.warn("Background update check failed: " .. tostring(err or "Unknown error"))
+			return
+		end
+
+		local response = utils.parse_json(output.stdout)
+		if not response or not response.tag_name then
+			msg.warn("Failed to parse GitHub release data")
+			return
+		end
+
+		local latest_version = response.tag_name
+		local current_version = yomipv_version
+
+		if version_to_number(latest_version) > version_to_number(current_version) then
+			msg.info("New version available: " .. latest_version)
+			Player.notify(
+				string.format("New Yomipv update available: %s (Press '%s' to update)", latest_version, config.key_update),
+				"info",
+				15
+			)
+		else
+			msg.info("Yomipv is up to date")
+		end
+	end, { user_agent = "Yomipv-Updater-Bot" })
+end
+
 local function launch_updater()
 	if not config.updater_enabled then
 		return
@@ -377,6 +423,7 @@ mp.register_script_message("yomipv-active-entry", function(expression, reading)
 	end
 end)
 
+check_for_updates()
 msg.info("Yomipv v" .. yomipv_version .. ": Initialized")
 Player.notify("Yomipv v" .. yomipv_version .. " loaded", "success", 2)
 

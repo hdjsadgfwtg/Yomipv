@@ -281,6 +281,7 @@ try {
     $updated = Update-Yomipv
     if ($updated) {
         Update-Dependencies
+        Write-Host "Update installed! Please restart MPV to apply changes." -ForegroundColor Cyan
     }
     
     Write-Host "Operation completed" -ForegroundColor Magenta

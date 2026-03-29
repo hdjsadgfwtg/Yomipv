@@ -97,6 +97,7 @@ if [ -d "$SCRIPT_DIR/.git" ]; then
     local old_conf=$(get_config)
     git pull origin main
     merge_config "$old_conf"
+    echo -e "${CYAN}Update installed! Please restart MPV to apply changes.${NC}"
     exit 0
 fi
 
@@ -123,6 +124,7 @@ fi
 
 if [ "$USER_PREF" == "source" ]; then
     update_from_source
+    echo -e "${CYAN}Update installed! Please restart MPV to apply changes.${NC}"
     echo -e "${MAGENTA}Operation completed${NC}"
     exit 0
 fi
@@ -175,4 +177,5 @@ unzip -o -q "$TEMP_ZIP" -d "$SCRIPT_DIR"
 merge_config "$old_conf"
 
 rm -f "$TEMP_ZIP"
+echo -e "${CYAN}Update installed! Please restart MPV to apply changes.${NC}"
 echo -e "${MAGENTA}Operation completed${NC}"

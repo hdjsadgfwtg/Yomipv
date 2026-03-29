@@ -251,6 +251,7 @@ local default_options = {
 
 	--[[ Updater settings ]]
 	updater_enabled = true,
+	updater_check_on_startup = true,
 	updater_use_source = false,
 	key_update = "U",
 
