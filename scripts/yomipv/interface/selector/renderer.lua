@@ -137,6 +137,14 @@ function Renderer.render(selector)
 	local margin_y = math.floor(sub_margin_y * scale_factor)
 	local y_base = math.floor((oh * sub_pos / 100) - margin_y)
 
+	-- Different color for persistent mode
+	local function get_sel_color()
+		if selector.persistent_mode then
+			return Display.fix_color(selector.style.selector_persistent_color or "FF8C00", "FF8C00")
+		end
+		return Display.fix_color(selector.style.selection_color or "00FFFF", "00FFFF")
+	end
+
 	local osd = Display:new()
 	osd:size(font_size)
 	osd:font(font_name)
@@ -243,7 +251,7 @@ function Renderer.render(selector)
 				local prefix = term:sub(1, start_byte - 1)
 				local colored = term:sub(start_byte, end_byte - 1)
 				local suffix = term:sub(end_byte)
-				local sel_color = Display.fix_color(selector.style.selection_color or "00FFFF", "00FFFF")
+				local sel_color = get_sel_color()
 
 				if prefix ~= "" then
 					osd:append(prefix)
@@ -255,7 +263,7 @@ function Renderer.render(selector)
 					osd:append(suffix)
 				end
 			elseif not selector.passive and is_selected and not selector.style.selection_underline then
-				local sel_color = Display.fix_color(selector.style.selection_color or "00FFFF", "00FFFF")
+				local sel_color = get_sel_color()
 				osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", sel_color, t_seg.visual_text, main_color))
 			elseif not selector.passive and is_locked then
 				local lock_color = Display.fix_color(selector.style.selector_lock_color or "FFD700", "FFD700")

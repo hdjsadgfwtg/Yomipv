@@ -252,10 +252,19 @@ function Yomitan:tokenize(text, callback, scan_length)
 	local sl = scan_length or DEFAULT_SCAN_LENGTH
 	local cache_key = tostring(text) .. "_" .. tostring(sl)
 
+	-- Make a copy so modifying it later doesn't affect the cached tokens
+	local function copy_tokens(tokens)
+		local copy = {}
+		for i = 1, #tokens do
+			copy[i] = tokens[i]
+		end
+		return copy
+	end
+
 	if self._tokenize_cache[cache_key] then
 		msg.info("yomitan.tokenize using cached result for: " .. tostring(text))
 		local entry = self._tokenize_cache[cache_key]
-		return callback(entry.tokens, entry.content)
+		return callback(copy_tokens(entry.tokens), entry.content)
 	end
 
 	local params = {
@@ -284,7 +293,8 @@ function Yomitan:tokenize(text, callback, scan_length)
 			content = content,
 		}
 
-		callback(tokens, content)
+		-- Don't modify the cached tokens
+		callback(copy_tokens(tokens), content)
 	end)
 end
 

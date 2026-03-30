@@ -186,12 +186,14 @@ function Handler:initialize_export_context(gui)
 		self.deps.tracker.clear()
 	end
 
-	-- Reset pinned entry state from previous session
+	-- Reset per-session state
 	self.active_entry_expression = nil
 	self.active_entry_reading = nil
 	self.selected_dictionary = nil
 	self.last_selection = nil
 	self.last_selection_hint = nil
+	self.is_expanding = false
+	self.expansion_gen = (self.expansion_gen or 0) + 1
 
 	local sub = self.deps.tracker.export_current_session()
 	local primary = StringOps.clean_subtitle(sub and sub.primary_sid or "", true)
@@ -327,13 +329,18 @@ end
 
 function Handler:handle_selector_result(context, selected_token)
 	msg.info("handle_selector_result: " .. (selected_token and "selected" or "cancelled"))
-	self.expand_to_subtitle = nil
 
-	if self.deps.history then
-		if self.config.selector_show_history and not context.history_was_open then
-			self.deps.history:close()
-		else
-			self.deps.history:update(true)
+	local keep_open = selected_token and selected_token.keep_open
+
+	if not keep_open then
+		self.expand_to_subtitle = nil
+
+		if self.deps.history then
+			if self.config.selector_show_history and not context.history_was_open then
+				self.deps.history:close()
+			else
+				self.deps.history:update(true)
+			end
 		end
 	end
 
@@ -731,9 +738,9 @@ function Handler:update_range_async(context, direction, completion_callback)
 	end
 
 	self.is_expanding = true
+	local captured_gen = self.expansion_gen
 	local target = direction < 0 and context.first_subtitle or context.last_subtitle
 
-	-- Lock expansion to prevent race conditions from rapid input
 	local function done()
 		self.is_expanding = false
 		if completion_callback then
@@ -741,7 +748,17 @@ function Handler:update_range_async(context, direction, completion_callback)
 		end
 	end
 
+	-- Ignore callbacks from older sessions
+	local function is_stale()
+		return self.expansion_gen ~= captured_gen
+	end
+
 	self.deps.tracker.get_adjacent_sub_async(target, direction, function(adjacent_subtitle)
+		if is_stale() then
+			self.is_expanding = false
+			return
+		end
+
 		if not adjacent_subtitle then
 			Player.notify("No more subtitles to include", "info", 1)
 			done()
@@ -753,6 +770,11 @@ function Handler:update_range_async(context, direction, completion_callback)
 		self.deps.yomitan:tokenize(
 			StringOps.clean_subtitle(adjacent_subtitle.primary_sid, true),
 			function(new_tokens, new_raw_content, expansion_error)
+				if is_stale() then
+					self.is_expanding = false
+					return
+				end
+
 				if expansion_error or not new_tokens then
 					Player.notify("Expansion failed", "error")
 					done()
@@ -794,6 +816,22 @@ function Handler:update_range_async(context, direction, completion_callback)
 					context.sub["end"] = adjacent_subtitle["end"]
 
 					self.deps.selector:append_tokens(new_tokens)
+				end
+
+				-- Keep colors in sync with tokens after changes
+				if self.config.selector_colorize_words and self.deps.selector.style then
+					local AnkiDB = require("lib.anki_db")
+					local updated_colors = {}
+					for i, token in ipairs(self.deps.selector.tokens) do
+						if token.headwords then
+							local color = AnkiDB.get_word_color(token.headwords)
+							if color then
+								updated_colors[i] = color
+							end
+						end
+					end
+					self.deps.selector.style.word_colors = updated_colors
+					self.deps.selector:render()
 				end
 
 				done()
@@ -873,6 +911,9 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 		key_expand_prev = self.config.key_expand_prev,
 		key_expand_next = self.config.key_expand_next,
 		key_lookup = self.config.key_selector_lookup,
+		key_selector_lock = self.config.key_selector_lock,
+		selector_lock_color = self.config.selector_lock_color,
+		selector_persistent_color = self.config.selector_persistent_color,
 
 		navigation_delay = self.config.selector_navigation_delay,
 		lookup_on_hover = self.config.selector_lookup_on_hover,
@@ -886,6 +927,9 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 		end,
 		on_expand_next = function()
 			update_range_fn(1)
+		end,
+		on_persistent_toggle = function(enabled)
+			Player.notify("Persistent mode: " .. (enabled and "On" or "Off"), "info", 1)
 		end,
 		on_click_fallback = function()
 			if self.deps.history then

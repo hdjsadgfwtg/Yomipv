@@ -24,6 +24,7 @@ local Selector = {
 	locked_index = nil,
 	locked_mora_index = nil,
 	passive = false,
+	persistent_mode = false,
 }
 
 
@@ -259,7 +260,6 @@ function Selector:confirm()
 		return
 	end
 
-
 	local token = {
 		text = state.text,
 		headwords = state.headwords,
@@ -267,9 +267,18 @@ function Selector:confirm()
 		is_term = true,
 	}
 
-	local cb = self.callback
-	self:clear()
-	cb(token)
+	if self.persistent_mode then
+		-- Export without closing, then reset to single-word selection for the next pick
+		token.keep_open = true
+		self.selection_len = 1
+		self.tail_mora_index = nil
+		self:render()
+		self.callback(token)
+	else
+		local cb = self.callback
+		self:clear()
+		cb(token)
+	end
 end
 
 function Selector:cancel()

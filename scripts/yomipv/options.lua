@@ -182,6 +182,7 @@ local default_options = {
 	selector_color = "#FFFFFF",
 	selector_selection_color = "#56FF68",
 	selector_lock_color = "#FFD700",
+	selector_persistent_color = "#FF8C00",
 	selector_border_color = "#000000",
 	selector_shadow_color = "#000000",
 
@@ -201,6 +202,7 @@ local default_options = {
 	key_expand_prev = "Shift+LEFT",
 	key_expand_next = "Shift+RIGHT",
 	key_selector_lookup = "Ctrl+c",
+	key_selector_lock = "v",
 	key_toggle_mora_navigation = "s",
 	key_toggle_selector_trigger_on_mouse_move = "z",
 	key_append_mode = "C",

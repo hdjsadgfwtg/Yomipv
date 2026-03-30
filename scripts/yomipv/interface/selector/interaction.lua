@@ -385,6 +385,14 @@ function Interaction.bind(selector)
 		end
 	end, "repeatable")
 
+	register(style.key_selector_lock or "", "selector-persistent-mode", function(s)
+		s.persistent_mode = not s.persistent_mode
+		if s.style.on_persistent_toggle then
+			s.style.on_persistent_toggle(s.persistent_mode)
+		end
+		s:render()
+	end)
+
 	mp.add_forced_key_binding("MOUSE_BTN2", "selector-lock-mouse", function()
 		selector.lookup_locked = not selector.lookup_locked
 		if selector.lookup_locked then
