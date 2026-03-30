@@ -137,25 +137,23 @@ jobs:
           cd ..
           
       - name: Generate Release Notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git fetch --tags --force
+          # Generate automatic release notes
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/releases/generate-notes \
+            -f tag_name=${{ github.ref_name }} | jq -r .body > release_body.md
           
-          CURRENT_TAG=${{ github.ref_name }}
-          PREV_TAG=$(git describe --tags --abbrev=0 $CURRENT_TAG^ 2>/dev/null || echo "")
-          
-          if [ -n "$PREV_TAG" ]; then
-            CHANGELOG_LINK="https://github.com/BrenoAqua/Yomipv/compare/${PREV_TAG}...${CURRENT_TAG}"
-          else
-            CHANGELOG_LINK="https://github.com/BrenoAqua/Yomipv/commits/${CURRENT_TAG}"
-          fi
-          
-          cat <<EOF > release_body.md
-          **Full Changelog**: $CHANGELOG_LINK
-          
+          # Append installation section
+          cat <<EOF >> release_body.md
+
           ---
-          
+
           ### Installation
-          
+
           1. Download the [Windows Zip](https://github.com/BrenoAqua/Yomipv/releases/download/${{ github.ref_name }}/win-yomipv-${{ github.ref_name }}.zip) or [Linux Zip](https://github.com/BrenoAqua/Yomipv/releases/download/${{ github.ref_name }}/linux-yomipv-${{ github.ref_name }}.zip).
           2. Extract the contents directly into your MPV directory:
               - Windows: \`%APPDATA%/mpv/\`
