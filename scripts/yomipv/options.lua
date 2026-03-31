@@ -160,6 +160,7 @@ local default_options = {
 	lookup_show_frequencies = true,
 	lookup_show_pitch_accents = true,
 	prioritize_kanji_match = false, -- Prioritize entries with Kanji over match length
+	lookup_app_allow_copy = false, -- Allow text selection and copy from lookup window (requires refocus)
 
 	-- Typography
 	selector_font_name = "", -- Fallback to mpv sub-font if unset

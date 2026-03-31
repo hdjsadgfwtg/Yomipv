@@ -75,7 +75,7 @@ function Platform.normalize_path(path)
 end
 
 -- Launcher implementation for Electron frontend
-function Platform.launch_electron_app(app_path, mpv_pid, ipc_pipe, callback)
+function Platform.launch_electron_app(app_path, mpv_pid, ipc_pipe, allow_copy, callback)
 	local binary_name = "YomipvLookup" .. Platform.get_binary_extension()
 	if Platform.IS_LINUX then
 		binary_name = "YomipvLookup.AppImage"
@@ -94,10 +94,12 @@ function Platform.launch_electron_app(app_path, mpv_pid, ipc_pipe, callback)
 		end
 	end
 
+	local allow_copy_str = allow_copy and "1" or "0"
+
 	if file_exists(binary_path) then
 		msg.info("Standalone binary found: " .. binary_path)
 
-		local args = { binary_path, "--parent-pid=" .. tostring(mpv_pid), "--ipc-pipe=" .. (ipc_pipe or "") }
+		local args = { binary_path, "--parent-pid=" .. tostring(mpv_pid), "--ipc-pipe=" .. (ipc_pipe or ""), "--allow-copy=" .. allow_copy_str }
 
 		msg.info("Starting standalone lookup app for PID: " .. tostring(mpv_pid))
 
@@ -128,6 +130,8 @@ function Platform.launch_electron_app(app_path, mpv_pid, ipc_pipe, callback)
 			tostring(mpv_pid),
 			"-ipcPipe",
 			ipc_pipe or "",
+			"-allowCopy",
+			allow_copy_str,
 		}
 
 		msg.info("Starting lookup app via PowerShell for PID: " .. tostring(mpv_pid))
@@ -153,6 +157,7 @@ function Platform.launch_electron_app(app_path, mpv_pid, ipc_pipe, callback)
 				start_sh,
 				tostring(mpv_pid),
 				ipc_pipe or "",
+				allow_copy_str,
 			}
 
 			msg.info("Starting lookup app via bash for PID: " .. tostring(mpv_pid))

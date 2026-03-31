@@ -4,6 +4,7 @@
 
 MPV_PID="$1"
 IPC_PIPE="$2"
+ALLOW_COPY="${3:-0}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR" || exit 1
@@ -28,7 +29,7 @@ STDOUT_LOG="$SCRIPT_DIR/lookup_app_stdout.log"
 STDERR_LOG="$SCRIPT_DIR/lookup_app_stderr.log"
 
 # Launch Lookup App with parent PID monitoring and IPC pipe
-"$LOOKUP_APP_BIN" . --parent-pid="$MPV_PID" --ipc-pipe="$IPC_PIPE" > "$STDOUT_LOG" 2> "$STDERR_LOG" &
+"$LOOKUP_APP_BIN" . --parent-pid="$MPV_PID" --ipc-pipe="$IPC_PIPE" --allow-copy="$ALLOW_COPY" > "$STDOUT_LOG" 2> "$STDERR_LOG" &
 
 LOOKUP_APP_PID=$!
 

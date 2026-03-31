@@ -1,4 +1,4 @@
-param([string]$mpvPid = "", [string]$ipcPipe = "")
+param([string]$mpvPid = "", [string]$ipcPipe = "", [string]$allowCopy = "0")
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 Set-Location $scriptDir
@@ -26,7 +26,7 @@ try {
     $stdOut = Join-Path $scriptDir "lookup_app_stdout.log"
     $stdErr = Join-Path $scriptDir "lookup_app_stderr.log"
     
-    $lookupAppArgs = @(".", "--parent-pid=$mpvPid", "--ipc-pipe=$ipcPipe")
+    $lookupAppArgs = @(".", "--parent-pid=$mpvPid", "--ipc-pipe=$ipcPipe", "--allow-copy=$allowCopy")
     Start-Process -FilePath $lookupAppCmd -ArgumentList $lookupAppArgs -WorkingDirectory $scriptDir -WindowStyle Hidden -RedirectStandardOutput $stdOut -RedirectStandardError $stdErr
     "[INFO] Lookup App process started. Logs at lookup_app_stdout.log and lookup_app_stderr.log" | Out-File $logFile -Append -Encoding UTF8
 } catch {

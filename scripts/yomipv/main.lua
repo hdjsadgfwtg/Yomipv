@@ -129,6 +129,7 @@ local function launch_lookup_app()
 			app_path,
 			mpv_pid,
 			electron_ipc_pipe,
+			config.lookup_app_allow_copy,
 			function(launch_success, _launch_result, launch_error)
 				if not launch_success then
 					msg.error("Failed to launch lookup app: " .. tostring(launch_error))

@@ -6,6 +6,9 @@ const net = require('net');
 let mainWindow;
 let pendingHide = false;
 
+const allowCopyArg = process.argv.find(arg => arg.startsWith('--allow-copy='));
+const allowCopy = allowCopyArg ? allowCopyArg.split('=')[1] === '1' : false;
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 850,
@@ -14,12 +17,12 @@ function createWindow() {
     transparent: true,
     show: false,
     skipTaskbar: true,
-    focusable: false,
+    focusable: allowCopy, // WARNING: when true, clicking the window steals focus from mpv — user must click back to resume hotkeys
     resizable: false,
     minimizable: false,
     maximizable: false,
     alwaysOnTop: true,
-    type: 'toolbar', 
+    type: 'toolbar',
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
@@ -29,9 +32,11 @@ function createWindow() {
   mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   mainWindow.loadFile('index.html');
-  mainWindow.webContents.on('context-menu', (e) => {
-    e.preventDefault();
-  });
+  if (!allowCopy) {
+    mainWindow.webContents.on('context-menu', (e) => {
+      e.preventDefault();
+    });
+  }
 }
 
 // mpv IPC setup
