@@ -21,4 +21,5 @@ if %errorlevel% equ 0 (
 )
 
 timeout 5
+pause
 popd

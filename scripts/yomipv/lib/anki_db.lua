@@ -3,6 +3,7 @@
 local mp = require("mp")
 local utils = require("mp.utils")
 local msg = require("mp.msg")
+local JSONFormat = require("lib.json_format")
 
 local AnkiDB = {}
 
@@ -156,7 +157,7 @@ function AnkiDB.add_word(word, state, interval)
 				local ok, parsed = pcall(utils.parse_json, content)
 				if ok and type(parsed) == "table" and type(parsed.words) == "table" then
 					parsed.words[word] = { state = new_state, interval = new_interval }
-					local new_json = utils.format_json(parsed)
+					local new_json = JSONFormat.format(parsed)
 					if new_json then
 						local out_file = io.open(path, "w")
 						if out_file then

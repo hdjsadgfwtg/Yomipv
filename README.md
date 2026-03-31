@@ -18,7 +18,7 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 ## Installation
 
 ### Recommended
-1. Download the [Windows Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v0.3.0/win-yomipv-v0.3.0.zip) or [Linux Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v0.3.0/linux-yomipv-v0.3.0.zip)
+1. Download the [Windows Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v0.3.7/win-yomipv-v0.3.7.zip) or [Linux Zip](https://github.com/BrenoAqua/Yomipv/releases/download/v0.3.7/linux-yomipv-v0.3.7.zip)
 2. Extract the contents directly into your MPV directory:
     - Windows: `%APPDATA%/mpv/`
     - Linux: `~/.config/mpv/`
@@ -57,9 +57,13 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
   - Press `Shift+C` to enter append mode, `c` to start the word selector, or `Shift+C` again to cancel
 
 - **Subtitle Substitution & Colorization (`S`)**: 
-  - Toggle between native MPV subtitles and Yomipv's colorized tokens
-  - Words are colorized based on their Anki card status (New, Learning, Review, Suspended) and intervals
+  - Press **`S`** to toggle between native MPV subtitles and Yomipv's colorized tokens
   - Enable `substitute_mpv_subtitles` in `yomipv.conf` to start with it enabled
+  - Words are colorized based on their Anki card metadata:
+    - **Status**: New, Learning, Review, Suspended
+    - **Intervals**: Reflects how well a word is known (affects color shades)
+    - **Requirement**: Press **`B`** to build/sync the local Anki database first before these statuses can be displayed for your existing collection
+  - **Instant Feedback**: When you create a card, the word is immediately added to the local database and highlighted (red) in the current subtitle
 
 - **Secondary Subtitle**:
   - Automatically select secondary subtitles based on preferred languages
@@ -77,6 +81,11 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
   - **Frequencies**: Toggle `lookup_show_frequencies` in `yomipv.conf`
   - See [docs/lookup-app.md](docs/lookup-app.md) for full details
 
+- **Persistent Mode (`v`)**: 
+  - Toggle persistent mode to export multiple words from a single subtitle selection without closing the selector
+  - Press **`v`** to toggle; the selection color changes to indicate it's active
+  - Confirming a selection exports the card but keeps the selector open for the next pick
+
 - **Auto-Trigger Selector (`z`)**:
   - Automatically open the selector by moving the mouse after it has been idle.
   - Enable `selector_trigger_on_mouse_move` and customize `selector_trigger_mouse_idle_time` in `yomipv.conf`
@@ -93,9 +102,9 @@ https://github.com/user-attachments/assets/8ff6f71a-c961-4da1-bf9f-b1b2c00143f8
 
 - **Auto-Updater (`U`)**: Keeps Yomipv updated to the latest version
   - Press **`U`** in MPV to trigger the update, or:
-    - On Windows: Run **`yomipv-updater.bat`** directly.
-    - On Linux: Run **`yomipv-updater.sh`** directly.
-  - Choose between latest official releases or latest source (main branch).
+    - On Windows: Run **`yomipv-updater.bat`** directly
+    - On Linux: Run **`yomipv-updater.sh`** directly
+  - Choose between latest official releases or latest source (main branch)
   - Automatically preserves user configuration in `script-opts/yomipv.conf`
   - Downloads platform-specific binaries for the Lookup App
   - (Source mode only) Updates dependencies for the Lookup App (requires Node.js)

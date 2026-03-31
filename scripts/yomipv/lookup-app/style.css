@@ -25,6 +25,29 @@
   --spacing: 12px;
 }
 
+.light-theme {
+  --bg-primary: #f0f2f5;
+  --bg-secondary: rgba(255, 255, 255, 0.98);
+  --bg-tertiary: rgba(0, 0, 0, 0.05);
+  --border-color: #d8dee9;
+  --text-primary: #2e3440;
+  --text-secondary: #4c566a;
+  --text-muted: #96a1b1;
+  --accent-color: #2e3440;
+  --pitch-accent-color: #2e3440;
+  --tag-bg: #e5e9f0;
+  --tag-text: #4c566a;
+  --tag-bg-alt: #fff0f0;
+  --selection-color: #00D179;
+  
+  /* pitch colors */
+  --pitch-red: #D62839;
+  --pitch-blue: #3474FF;
+  --pitch-orange: #FF6E03;
+  --pitch-green: #2BAF7E;
+  --pitch-purple: #8A5EDE;             
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -180,6 +203,10 @@ body {
   border-radius: 4px;
 }
 
+.light-theme #scroll-content::-webkit-scrollbar-thumb {
+  background: #ccc;
+}
+
 .highlight {
   font-weight: 700;
   color: var(--selection-color);
@@ -191,7 +218,7 @@ body {
   margin-top: 14px;
   margin-bottom: 8px;
   padding-bottom: 4px;
-  border-bottom: 1px solid #3d3d3d;
+  border-bottom: 1px solid var(--border-color);
   display: block;
 }
 
@@ -202,7 +229,7 @@ body {
 
 /* Title marker style */
 [data-dictionary] > *:first-child {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-muted);
   font-weight: 700;
   font-style: normal !important;
   font-size: 16px;
@@ -216,7 +243,8 @@ body {
 }
 
 [data-dictionary] > *:first-child:hover {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary) !important;
+  text-shadow: 0 0 10px var(--bg-primary) !important;
 }
 
 [data-dictionary] > *:first-child.selected {
@@ -233,7 +261,7 @@ body {
     content: "JITENDEX";
     font-size: 16px;
     font-weight: 700;
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--text-muted);
     letter-spacing: 0.12em;
 }
 
@@ -406,6 +434,11 @@ div[style*="border-left"] {
   z-index: 10;
 }
 
+.light-theme #entry-prev,
+.light-theme #entry-next {
+  color: rgba(0, 0, 0, 0.2);
+}
+
 #entry-prev {
   left: 0;
   border-radius: var(--radius) 0 0 var(--radius);
@@ -422,6 +455,12 @@ div[style*="border-left"] {
   background-color: rgba(255, 255, 255, 0.05);
 }
 
+.light-theme #entry-prev:hover,
+.light-theme #entry-next:hover {
+  color: rgba(0, 0, 0, 0.8);
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
 #entry-counter {
   position: absolute;
   top: 12px;
@@ -433,7 +472,292 @@ div[style*="border-left"] {
   pointer-events: none;
   user-select: none;
   z-index: 11;
-  background-color: rgba(30,30,30,0.8);
+  background-color: var(--bg-secondary);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   padding: 2px 8px;
   border-radius: 4px;
+}
+
+/* 明鏡国語辞典 */
+
+[data-dictionary*="大辞泉"] {
+  --meikyo-white: #000000;
+  --meikyo-black: #cccccc;
+  --meikyo-blue: #33ccff;
+  --meikyo-red: #ff3333;
+  --meikyo-gray: #bbbbbb;
+  --meikyo-pink: #cc6666;
+  --meikyo-dark-red: #993333;
+  --meikyo-fbox-white: #ffffff;
+  --meikyo-fbox-gray: #cccccc;
+  --meikyo-box-gray: #663333;
+  --dict-color-dark: rgba(255, 255, 255, 0.4);
+}
+
+[data-dictionary*="明鏡国語辞典"] div[data-sc-ruigo_items] {
+	display: none !important;
+}
+
+[data-dictionary="明鏡国語辞典 第三版"] span {
+  width: 25em !important;
+  vertical-align: bottom !important;
+}
+
+[data-dictionary="明鏡国語辞典 第三版"] span[data-sc-fbox][data-sc-class="品格"] {
+  padding: 1px !important;
+}
+
+li[data-dictionary="明鏡国語辞典 第三版"] [data-sc-img] img {
+  display: none !important;
+}
+
+li[data-dictionary="明鏡国語辞典 第三版"] [data-sc-img] span[style*="--image"] {
+  display: block !important;
+  background-color: white !important;
+  width: 100% !important;
+  height: 100% !important;
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: 1 !important;
+}
+
+.yomitan-glossary [data-dictionary="明鏡国語辞典 第三版"] div[data-sc-head2] {
+  margin-block-start: 0 !important;
+}
+
+.yomitan-glossary [data-dictionary="明鏡国語辞典 第三版"] details {
+  margin-block: 0 !important;
+}
+
+[data-dictionary="明鏡国語辞典 第三版"] [data-sc-body] {
+  line-height: 1.9em !important;
+}
+
+[data-dictionary="明鏡国語辞典 第三版"] details:not(:last-child) summary {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  line-height: 1.5 !important;
+}
+
+[data-dictionary="明鏡国語辞典 第三版"] details:not(:last-child) summary {
+  margin-bottom: 0.2rem !important;
+}
+
+/* 小学館例解学習国語 */
+
+ li[data-dictionary*="小学館例解学習国語"] {
+  --rgko12-light-blue: #7fb4f3;
+	--rgko12-light-light-blue: #DDEEFF;
+	--rgko12-light-light-purple: #EEDDFF;
+	--rgko12-cream: #333300;
+	--rgko12-spring: #DDFFEE;
+	--rgko12-summer: #DDFFEE;
+	--rgko12-autumn: #FFEECC;
+	--rgko12-winter: #CCEEFF;
+	--rgko12-travel: #DDFFEE;
+	--rgko12-romance: #EEDDFF;
+	--rgko12-other: #FFFFCC;
+	--rgko12-red: #d65252;
+  --rgko12-orange: #FF9900;
+	--rgko12-light-orange: #FFCC99;
+	--rgko12-pink: #FF0099;
+	--rgko12-gray: rgba(0, 0, 0, 0.05);
+	--rgko12-brown: #976B33;
+	--rgko12-light-brown: #696158;
+  --rgko12-green: ;
+	--rgko12-blue: ;
+	--rgko12-light-blue: #7dc9ef;
+	--rgko12-light-light-blue: #003366;
+	--rgko12-light-light-purple: #330033;
+	--rgko12-light-orange: #663300;
+	--rgko12-gray: rgba(255, 255, 255, 0.1);
+	--rgko12-brown: #885522;
+	--rgko12-light-light-brown: ;
+}
+
+.yomitan-glossary [data-dictionary="小学館例解学習国語 第十二版"] [data-sc-num] {
+  margin-right: 0.25em;
+}
+
+[data-dictionary="小学館例解学習国語 第十二版"] [data-sc-image] {
+    margin-block: 0 !important;
+}
+
+li[data-dictionary*="小学館例解学習国語"] [data-sc-num] {
+  font-weight: normal !important;
+}
+
+[data-sc-ws] {
+  border-style: solid; 
+  border-width: 0.05em; 
+}
+
+.light-theme
+.yomitan-glossary [data-dictionary="小学館例解学習国語 第十二版"] [data-sc-blue] {
+  color: black !important;
+}
+
+.yomitan-glossary [data-dictionary="小学館例解学習国語 第十二版"] [data-sc-blue] {
+  color: white !important;
+}
+
+li[data-dictionary="小学館例解学習国語 第十二版"] span[style*="padding-top"] {
+  display: none !important;
+}
+
+li[data-dictionary="小学館例解学習国語 第十二版"] span[style*="width"][style*="em"] {
+  width: auto !important;
+  max-width: 100% !important;
+  height: auto !important;
+  display: block !important;
+  font-size: 1rem !important;
+}
+
+li[data-dictionary="小学館例解学習国語 第十二版"] img {
+  position: static !important;
+  display: block !important;
+  width: auto !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: 300px;
+  margin: 0 !important;
+  border-radius: var(--border-radius-ms);
+}
+
+li[data-dictionary="小学館例解学習国語 第十二版"] table[data-sc-image] {
+  display: block !important;
+  width: 100% !important;
+  border: none !important;
+}
+
+li[data-dictionary="小学館例解学習国語 第十二版"] tbody, 
+li[data-dictionary="小学館例解学習国語 第十二版"] tr[data-sc-tr] {
+  display: flex !important;
+  flex-flow: row wrap !important;
+  align-items: flex-start !important;
+  gap: 10px !important;
+  border: none !important;
+}
+
+li[data-dictionary="小学館例解学習国語 第十二版"] td[data-sc-td] {
+  display: block !important;
+  border: none !important;
+  padding: 0 !important;
+  width: auto !important;
+  flex: 0 1 auto !important;
+}
+
+li[data-dictionary="小学館例解学習国語 第十二版"] td[data-sc-caption] {
+  padding: 0 5px !important;
+  margin-inline-start: 0 !important;
+  text-align: left !important;
+}
+
+li[data-dictionary="小学館例解学習国語 第十二版"] table[data-sc使い分け] {
+    display: table !important;
+    width: 100% !important;
+    margin: 0 !important;
+}
+
+li[data-dictionary="小学館例解学習国語 第十二版"] table[data-sc使い分け] tbody,
+li[data-dictionary="小学館例解学習国語 第十二版"] table[data-sc使い分け] tr[data-sc-tr] {
+    display: table-row !important;
+    flex-flow: unset !important;
+    gap: 0 !important;
+}
+
+li[data-dictionary="小学館例解学習国語 第十二版"] table[data-sc使い分け] td[data-sc-td] {
+    display: table-cell !important;
+    border: 1px solid #666 !important;
+    padding: 4px 8px !important;
+    vertical-align: middle !important;
+    width: auto !important;
+}
+
+li[data-dictionary="小学館例解学習国語 第十二版"] table[data-sc使い分け] td[data-sc-td]:first-child {
+    text-align: left !important;
+    width: 30% !important;
+}
+
+li[data-dictionary="小学館例解学習国語 第十二版"] table[data-sc使い分け] td[data-sc-td]:not(:first-child) {
+    text-align: center !important;
+    width: auto !important;
+}
+
+li[data-dictionary="小学館例解学習国語 第十二版"] table[data-sc使い分け] td[data-sc-yes] {
+    font-weight: bold !important;
+    font-size: 1.2em !important;
+}
+
+/* 大辞泉 */
+
+[data-dictionary*="大辞泉"] {
+  --daijisen-black: #ffffff;
+  --daijisen-white: #000000;
+  --daijisen-blue: #00aaff;
+  --daijisen-header-djs: #a0484f;
+  --daijisen-header-djsp: #7a7a7a;
+  --daijisen-header-text: #000000;
+  --daijisen-logo-color: #606060;
+  --daijisen-background-l3: #606060;
+  --daijisen-accent-mark: #ff6666;
+  --daijisen-accent-slash: #a0a0a0;
+}
+
+[data-sc-class="bold FM"], [data-sc-class="IM"], [data-sc-class="FM"] {
+ padding: 1px !important;
+}
+
+.yomitan-glossary [data-dictionary="大辞泉 第二版"] div[data-sc-meaning][data-sc-c] {
+    margin-block: 0 !important;
+}
+
+.light-theme :is([data-dictionary*="大辞泉"]) 
+span[data-sc補足ロゴ], span[data-sc-rect][data-sc-l3] {
+ color: black !important;
+}
+
+:is([data-dictionary*="大辞泉"]) 
+span[data-sc補足ロゴ], span[data-sc-rect][data-sc-l3] {
+ color: white !important;
+}
+
+div[data-sc-meaning][data-sc-c][data-sc-class="C"]:has(span[data-sc-href="$c-ruigo"]),
+div[data-sc-meaning][data-sc-c][data-sc-class="C"]:has(span[data-sc-href="$c-ssgo"]) {
+  display: none;
+}
+
+div[data-sc-m-accent-audio-g] {
+  display: none;
+}
+
+/* Jitendex Settings */
+
+.yomitan-glossary [data-dictionary*="Jitendex.org"] {
+  & :is(
+      li[data-sc-content="sense-group"],
+      li[data-sc-content="forms"],
+      ul[data-sc-content="glossary"]
+    ) {
+    padding-left: 0 !important;
+  }
+
+  & :is(
+      div[data-sc-content="sense-group"],
+      li[data-sc-content="sense-group"]:first-child
+    ) {
+    margin-top: 0 !important;
+  }
+
+  & span[data-sc-class="tag"] {
+    margin-right: 0.25em !important;
+  }
+}
+
+li > span > div > span[data-sc-code] + ol > li,
+ol > li:has(> span[data-sc-code] + ol) > ol > li,
+ul > li:has(> span[data-sc-code] + ol) > ol > li {
+  display: inline;
+  padding-left: 0 !important;
 }

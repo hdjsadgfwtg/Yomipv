@@ -97,9 +97,25 @@ local function split_cloze(context, target, surface, offset)
 end
 
 local function format_sentence_html(self, prefix, body, suffix, tag)
-	local closing_tag = tag:match("<([%w%-]+)")
+	local function sanitize_text(text)
+		if not text then
+			return ""
+		end
+		return text:gsub("sentence_highlight_tag=[^%s%p]*", ""):gsub("sentence_highlight_tag=", "")
+	end
+
+	local clean_prefix = sanitize_text(prefix)
+	local clean_suffix = sanitize_text(suffix)
+
+	local clean_tag = tag and tag:match("=(<.*)") or tag
+	if not clean_tag or clean_tag == "" then
+		clean_tag = "<b>"
+	end
+
+	local closing_tag = clean_tag:match("<([%w%-]+)")
 	closing_tag = closing_tag and ("</" .. closing_tag .. ">") or "</span>"
-	local content = string.format("%s%s%s%s%s", prefix or "", tag or "", body or "", closing_tag, suffix or "")
+	local content =
+		string.format("%s%s%s%s%s", clean_prefix, clean_tag, body or "", closing_tag, clean_suffix)
 	return string.format(self.config.primary_sentence_wrapper, content)
 end
 
@@ -170,12 +186,14 @@ function Handler:initialize_export_context(gui)
 		self.deps.tracker.clear()
 	end
 
-	-- Reset pinned entry state from previous session
+	-- Reset per-session state
 	self.active_entry_expression = nil
 	self.active_entry_reading = nil
 	self.selected_dictionary = nil
 	self.last_selection = nil
 	self.last_selection_hint = nil
+	self.is_expanding = false
+	self.expansion_gen = (self.expansion_gen or 0) + 1
 
 	local sub = self.deps.tracker.export_current_session()
 	local primary = StringOps.clean_subtitle(sub and sub.primary_sid or "", true)
@@ -311,13 +329,18 @@ end
 
 function Handler:handle_selector_result(context, selected_token)
 	msg.info("handle_selector_result: " .. (selected_token and "selected" or "cancelled"))
-	self.expand_to_subtitle = nil
 
-	if self.deps.history then
-		if self.config.selector_show_history and not context.history_was_open then
-			self.deps.history:close()
-		else
-			self.deps.history:update(true)
+	local keep_open = selected_token and selected_token.keep_open
+
+	if not keep_open then
+		self.expand_to_subtitle = nil
+
+		if self.deps.history then
+			if self.config.selector_show_history and not context.history_was_open then
+				self.deps.history:close()
+			else
+				self.deps.history:update(true)
+			end
 		end
 	end
 
@@ -715,9 +738,9 @@ function Handler:update_range_async(context, direction, completion_callback)
 	end
 
 	self.is_expanding = true
+	local captured_gen = self.expansion_gen
 	local target = direction < 0 and context.first_subtitle or context.last_subtitle
 
-	-- Lock expansion to prevent race conditions from rapid input
 	local function done()
 		self.is_expanding = false
 		if completion_callback then
@@ -725,7 +748,17 @@ function Handler:update_range_async(context, direction, completion_callback)
 		end
 	end
 
+	-- Ignore callbacks from older sessions
+	local function is_stale()
+		return self.expansion_gen ~= captured_gen
+	end
+
 	self.deps.tracker.get_adjacent_sub_async(target, direction, function(adjacent_subtitle)
+		if is_stale() then
+			self.is_expanding = false
+			return
+		end
+
 		if not adjacent_subtitle then
 			Player.notify("No more subtitles to include", "info", 1)
 			done()
@@ -737,6 +770,11 @@ function Handler:update_range_async(context, direction, completion_callback)
 		self.deps.yomitan:tokenize(
 			StringOps.clean_subtitle(adjacent_subtitle.primary_sid, true),
 			function(new_tokens, new_raw_content, expansion_error)
+				if is_stale() then
+					self.is_expanding = false
+					return
+				end
+
 				if expansion_error or not new_tokens then
 					Player.notify("Expansion failed", "error")
 					done()
@@ -780,6 +818,22 @@ function Handler:update_range_async(context, direction, completion_callback)
 					self.deps.selector:append_tokens(new_tokens)
 				end
 
+				-- Keep colors in sync with tokens after changes
+				if self.config.selector_colorize_words and self.deps.selector.style then
+					local AnkiDB = require("lib.anki_db")
+					local updated_colors = {}
+					for i, token in ipairs(self.deps.selector.tokens) do
+						if token.headwords then
+							local color = AnkiDB.get_word_color(token.headwords)
+							if color then
+								updated_colors[i] = color
+							end
+						end
+					end
+					self.deps.selector.style.word_colors = updated_colors
+					self.deps.selector:render()
+				end
+
 				done()
 			end
 		)
@@ -788,7 +842,7 @@ end
 
 function Handler:on_current_tokens_ready(tokens)
 	self.current_tokens = tokens
-	if not self.config.substitute_mpv_subtitles then
+	if not self.config.colorizer_enabled then
 		return
 	end
 
@@ -807,7 +861,7 @@ end
 
 function Handler:clear_passive()
 	self.current_tokens = nil
-	if not self.config.substitute_mpv_subtitles then
+	if not self.config.colorizer_enabled then
 		return
 	end
 	self.deps.selector:clear_passive()
@@ -835,6 +889,10 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 		font_name = self.config.selector_font_name,
 		color = self.config.selector_color,
 		selection_color = self.config.selector_selection_color,
+		selection_underline = self.config.selector_selection_underline,
+		colorize_underline = self.config.selector_colorize_underline,
+		underline_thickness = self.config.selector_underline_thickness,
+		underline_offset = self.config.selector_underline_offset,
 		border_color = self.config.selector_border_color,
 		shadow_color = self.config.selector_shadow_color,
 		border_size = self.config.selector_border_size,
@@ -853,6 +911,9 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 		key_expand_prev = self.config.key_expand_prev,
 		key_expand_next = self.config.key_expand_next,
 		key_lookup = self.config.key_selector_lookup,
+		key_selector_lock = self.config.key_selector_lock,
+		selector_lock_color = self.config.selector_lock_color,
+		selector_persistent_color = self.config.selector_persistent_color,
 
 		navigation_delay = self.config.selector_navigation_delay,
 		lookup_on_hover = self.config.selector_lookup_on_hover,
@@ -866,6 +927,9 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 		end,
 		on_expand_next = function()
 			update_range_fn(1)
+		end,
+		on_persistent_toggle = function(enabled)
+			Player.notify("Persistent mode: " .. (enabled and "On" or "Off"), "info", 1)
 		end,
 		on_click_fallback = function()
 			if self.deps.history then
@@ -892,6 +956,8 @@ function Handler:build_selector_style(update_range_fn, was_paused, tokens)
 				showFrequencies = self.config.lookup_show_frequencies,
 				showPitchAccents = self.config.lookup_show_pitch_accents,
 				prioritizeKanjiMatch = self.config.prioritize_kanji_match,
+				prioritizeHiraganaMatch = self.config.prioritize_hiragana_match,
+				theme = self.config.lookup_theme,
 			}
 			local json_body = require("mp.utils").format_json(data_to_send)
 			Curl.post("http://127.0.0.1:19634", json_body, function() end)
@@ -1060,22 +1126,30 @@ function Handler:new()
 end
 
 function Handler:init()
-	if self.config.substitute_mpv_subtitles then
+	if self.config.colorizer_enabled then
 		mp.set_property("sub-visibility", "no")
 	end
 end
 
-function Handler:toggle_substitute()
-	self.config.substitute_mpv_subtitles = not self.config.substitute_mpv_subtitles
-	self.config.save("substitute_mpv_subtitles", self.config.substitute_mpv_subtitles)
-	if self.config.substitute_mpv_subtitles then
-		Player.notify("Substitution: Enabled", "info", 2)
+function Handler:toggle_colorizer()
+	self.config.colorizer_enabled = not self.config.colorizer_enabled
+	self.config.save("colorizer_enabled", self.config.colorizer_enabled)
+	if self.config.colorizer_enabled then
+		Player.notify("Colorizer: Enabled", "info", 2)
 		mp.set_property("sub-visibility", "no")
-		if self.current_tokens then
-			self:on_current_tokens_ready(self.current_tokens)
+		local sub = self.deps.tracker.export_current_session()
+		if sub and sub.primary_sid and sub.primary_sid ~= "" then
+			local cleaned = StringOps.clean_subtitle(sub.primary_sid, true)
+			self.deps.yomitan:tokenize(cleaned, function(tokens)
+				if self.config.colorizer_enabled then
+					self:on_current_tokens_ready(tokens)
+				end
+			end)
+		else
+			self.deps.selector:clear_passive()
 		end
 	else
-		Player.notify("Substitution: Disabled", "info", 2)
+		Player.notify("Colorizer: Disabled", "info", 2)
 		mp.set_property("sub-visibility", "yes")
 		self.deps.selector:clear_passive()
 	end

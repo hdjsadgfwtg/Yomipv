@@ -64,6 +64,11 @@ function Renderer.render(selector)
 		or mp.get_property_number("sub-pos", 100)
 	local sub_bold = selector.style.bold ~= nil and selector.style.bold or mp.get_property_bool("sub-bold", true)
 
+	local u_thickness = (selector.style.underline_thickness or 4) * scale_factor
+	local u_offset = (selector.style.underline_offset or 2) * scale_factor
+	local u_color = Display.fix_color(selector.style.selection_color or "00FFFF", "00FFFF")
+	local underlines = {}
+
 	local border_size = (selector.style.border_size or mp.get_property_number("sub-border-size", 2)) * scale_factor
 	local shadow_offset = (selector.style.shadow_offset or mp.get_property_number("sub-shadow-offset", 0))
 		* scale_factor
@@ -132,6 +137,14 @@ function Renderer.render(selector)
 	local margin_y = math.floor(sub_margin_y * scale_factor)
 	local y_base = math.floor((oh * sub_pos / 100) - margin_y)
 
+	-- Different color for persistent mode
+	local function get_sel_color()
+		if selector.persistent_mode then
+			return Display.fix_color(selector.style.selector_persistent_color or "FF8C00", "FF8C00")
+		end
+		return Display.fix_color(selector.style.selection_color or "00FFFF", "00FFFF")
+	end
+
 	local osd = Display:new()
 	osd:size(font_size)
 	osd:font(font_name)
@@ -172,7 +185,56 @@ function Renderer.render(selector)
 				)
 			)
 
-			if not selector.passive and is_partially_selected then
+			local wc = selector.style.word_colors and selector.style.word_colors[t_seg.index]
+
+			-- Handle underline collection
+			local added_underline = false
+			if not selector.passive and selector.style.selection_underline then
+				if is_partially_selected then
+					local start_char = has_front_slice and selector.mora_index or 1
+					local end_char = nil
+					if has_back_slice then
+						if has_front_slice and selector.mora_index and selector.mora_index > 1 then
+							end_char = selector.mora_index + selector.tail_mora_index - 1
+						else
+							end_char = selector.tail_mora_index
+						end
+					end
+
+					local term = t_seg.visual_text
+					local start_byte = selector.get_mora_byte_pos(term, start_char)
+					local end_byte = end_char and selector.get_mora_byte_pos(term, end_char + 1) or (#term + 1)
+					local prefix = term:sub(1, start_byte - 1)
+					local colored = term:sub(start_byte, end_byte - 1)
+
+					if colored ~= "" then
+						local px = current_x + Renderer.measure_width(prefix, font_size, font_name, sub_bold)
+						local cw = Renderer.measure_width(colored, font_size, font_name, sub_bold)
+						table.insert(underlines, { x = px, y = y_line + u_offset, w = cw, color = u_color })
+						added_underline = true
+					end
+				elseif is_selected then
+					table.insert(underlines, {
+						x = current_x,
+						y = y_line + u_offset,
+						w = t_seg.width,
+						color = u_color,
+					})
+					added_underline = true
+				end
+			end
+
+			if not added_underline and selector.style.colorize_underline and wc then
+				table.insert(underlines, {
+					x = current_x,
+					y = y_line + u_offset,
+					w = t_seg.width,
+					color = wc,
+				})
+			end
+
+			-- Handle text rendering
+			if not selector.passive and is_partially_selected and not selector.style.selection_underline then
 				local start_char = has_front_slice and selector.mora_index or 1
 				local end_char = nil
 				if has_back_slice then
@@ -189,13 +251,19 @@ function Renderer.render(selector)
 				local prefix = term:sub(1, start_byte - 1)
 				local colored = term:sub(start_byte, end_byte - 1)
 				local suffix = term:sub(end_byte)
-				local sel_color = Display.fix_color(selector.style.selection_color or "00FFFF", "00FFFF")
+				local sel_color = get_sel_color()
 
-				if prefix ~= "" then osd:append(prefix) end
-				if colored ~= "" then osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", sel_color, colored, main_color)) end
-				if suffix ~= "" then osd:append(suffix) end
-			elseif not selector.passive and is_selected then
-				local sel_color = Display.fix_color(selector.style.selection_color or "00FFFF", "00FFFF")
+				if prefix ~= "" then
+					osd:append(prefix)
+				end
+				if colored ~= "" then
+					osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", sel_color, colored, main_color))
+				end
+				if suffix ~= "" then
+					osd:append(suffix)
+				end
+			elseif not selector.passive and is_selected and not selector.style.selection_underline then
+				local sel_color = get_sel_color()
 				osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", sel_color, t_seg.visual_text, main_color))
 			elseif not selector.passive and is_locked then
 				local lock_color = Display.fix_color(selector.style.selector_lock_color or "FFD700", "FFD700")
@@ -204,14 +272,17 @@ function Renderer.render(selector)
 					local start_byte = selector.get_mora_byte_pos(term, selector.locked_mora_index)
 					local prefix = term:sub(1, start_byte - 1)
 					local colored = term:sub(start_byte)
-					if prefix ~= "" then osd:append(prefix) end
-					if colored ~= "" then osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", lock_color, colored, main_color)) end
+					if prefix ~= "" then
+						osd:append(prefix)
+					end
+					if colored ~= "" then
+						osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", lock_color, colored, main_color))
+					end
 				else
 					osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", lock_color, t_seg.visual_text, main_color))
 				end
 			else
-				local wc = selector.style.word_colors and selector.style.word_colors[t_seg.index]
-				if wc then
+				if wc and not selector.style.colorize_underline then
 					osd:append(string.format("{\\1c&H%s&}%s{\\1c&H%s&}", wc, t_seg.visual_text, main_color))
 				else
 					osd:append(t_seg.visual_text)
@@ -231,6 +302,33 @@ function Renderer.render(selector)
 		if l_idx < #lines then
 			osd:append("\\N")
 		end
+	end
+
+	for _, u in ipairs(underlines) do
+		osd:new_event()
+		osd:reset()
+		osd:pos(0, 0)
+		osd:alignment(7)
+		osd:color(u.color or u_color)
+		osd:alpha("00")
+		osd:border(border_size)
+		osd:shadow(0)
+		osd:append(string.format("{\\3c&H%s&}", border_color))
+		osd:append("{\\p1}")
+		osd:append(
+			string.format(
+				"m %d %d l %d %d %d %d %d %d",
+				u.x,
+				u.y,
+				u.x + u.w,
+				u.y,
+				u.x + u.w,
+				u.y + u_thickness,
+				u.x,
+				u.y + u_thickness
+			)
+		)
+		osd:append("{\\p0}")
 	end
 
 	mp.set_osd_ass(ow, oh, osd:get_text())

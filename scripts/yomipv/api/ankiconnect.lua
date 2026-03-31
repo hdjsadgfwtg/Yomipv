@@ -192,6 +192,22 @@ function AnkiConnect:find_notes(query, callback)
 	self:request("findNotes", params, callback)
 end
 
+function AnkiConnect:find_cards(query, callback)
+	local params = {
+		query = query,
+	}
+
+	self:request("findCards", params, callback)
+end
+
+function AnkiConnect:cards_info(card_ids, callback)
+	local params = {
+		cards = card_ids,
+	}
+
+	self:request("cardsInfo", params, callback)
+end
+
 function AnkiConnect:notes_info(note_ids, callback)
 	local params = {
 		notes = note_ids,

@@ -16,6 +16,7 @@ let currentDictionaryMedia = [];
 let lookupHistory = [];
 let currentAbortController = null;
 let currentPrioritizeKanjiMatch = false;
+let currentPrioritizeHiraganaMatch = false;
 let currentShowPitchAccents = true;
 
 const filterDictionaryStyles = (styleEl, dictName) => {
@@ -105,7 +106,7 @@ const renderHeader = (term, reading, frequencies) => {
       if (subTerm && subTerm !== cleanTerm) {
         console.log('[UI] Sending sync-selection for header click:', subTerm);
         ipcRenderer.send('sync-selection-hint', subTerm);
-        performLookup(subTerm, currentShowFrequencies, false, currentPrioritizeKanjiMatch);
+        performLookup(subTerm, currentShowFrequencies, currentShowPitchAccents, false, currentPrioritizeKanjiMatch, currentPrioritizeHiraganaMatch);
       }
     };
   });
@@ -115,7 +116,7 @@ const renderHeader = (term, reading, frequencies) => {
     e.preventDefault();
     if (lookupHistory.length > 0) {
       const prev = lookupHistory.pop();
-      performLookup(prev.term, prev.showFrequencies, prev.showPitchAccents, true, prev.prioritizeKanjiMatch);
+      performLookup(prev.term, prev.showFrequencies, prev.showPitchAccents, true, prev.prioritizeKanjiMatch, prev.prioritizeHiraganaMatch);
     }
   };
 };
@@ -329,7 +330,7 @@ const sendSelectedDict = (el) => {
   ipcRenderer.send('dictionary-selected', dictContent);
 };
 
-const performLookup = async (term, showFrequencies, showPitchAccents, isBack = false, prioritizeKanjiMatch) => {
+const performLookup = async (term, showFrequencies, showPitchAccents, isBack = false, prioritizeKanjiMatch, prioritizeHiraganaMatch) => {
   console.log('[UI] Performing lookup for:', term);
   
   const container = document.getElementById('lookup-container');
@@ -363,12 +364,19 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
 
   // Save current term to history if not going back
   if (!isBack && currentTerm && currentTerm !== term) {
-    lookupHistory.push({ term: currentTerm, showFrequencies: currentShowFrequencies, showPitchAccents: currentShowPitchAccents, prioritizeKanjiMatch: currentPrioritizeKanjiMatch });
+    lookupHistory.push({
+      term: currentTerm,
+      showFrequencies: currentShowFrequencies,
+      showPitchAccents: currentShowPitchAccents,
+      prioritizeKanjiMatch: currentPrioritizeKanjiMatch,
+      prioritizeHiraganaMatch: currentPrioritizeHiraganaMatch
+    });
   }
 
   currentShowFrequencies = showFrequencies || false;
   currentShowPitchAccents = showPitchAccents !== undefined ? showPitchAccents : true;
   currentPrioritizeKanjiMatch = prioritizeKanjiMatch !== undefined ? prioritizeKanjiMatch : false;
+  currentPrioritizeHiraganaMatch = prioritizeHiraganaMatch !== undefined ? prioritizeHiraganaMatch : false;
 
   // Show transition screen only for non-subword transitions
   if (!isSubword) {
@@ -456,14 +464,48 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
       return;
     }
 
-    // Precompute matched lengths (avoid repeated work inside sort comparator)
-    const termChars = toNormalizedChars(term);
+    // Fetch termEntries in parallel to get maxOriginalTextLength per entry,
+    // which reflects how many characters Yomitan consumed (including deconjugation).
+    // This correctly ranks deconjugated forms above shorter literal prefix matches.
+    const origLenMap = new Map();
+    try {
+      const termEntriesEndpoints = [
+        `http://127.0.0.1:19633/termEntries`,
+        `http://127.0.0.1:19633/api/termEntries`,
+      ];
+      let teResult;
+      for (const url of termEntriesEndpoints) {
+        if (signal.aborted) break;
+        try {
+          const r = await fetch(url, {
+            method: 'POST',
+            signal,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ term }),
+          });
+          if (r.ok) { teResult = await r.json(); break; }
+        } catch (_) { /* try next endpoint */ }
+      }
+      if (teResult && Array.isArray(teResult.dictionaryEntries)) {
+        for (const de of teResult.dictionaryEntries) {
+          const origLen = de.maxOriginalTextLength || 0;
+          if (!origLen) continue;
+          for (const hw of (de.headwords || [])) {
+            const key = `${hw.term}\x00${hw.reading}`;
+            if ((origLenMap.get(key) || 0) < origLen) origLenMap.set(key, origLen);
+          }
+        }
+      }
+    } catch (_) { /* non-critical; fall back to prefix-match sort */ }
+
     const isKatakanaOnly = /^[\u30A0-\u30FF]+$/.test(term);
-    const matchedLenMap = new Map();
-    for (const entry of entries) {
-      const f = entry.fields || entry;
-      matchedLenMap.set(entry, computeMatchedLen(termChars, f.expression || '', f.reading || ''));
-    }
+    const isHiraganaOnly = /^[\u3041-\u309F]+$/.test(term);
+    const termChars = toNormalizedChars(term);
+
+    const getOrigLen = (f) => {
+      const key = `${f.expression || ''}\x00${f.reading || ''}`;
+      return origLenMap.get(key) || 0;
+    };
 
     const sorted = [...entries].sort((a, b) => {
       const fa = a.fields || a;
@@ -472,34 +514,48 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
       const exprA = fa.expression || '';
       const exprB = fb.expression || '';
 
-      // Katakana priority
+      // Katakana exact-match priority
       if (isKatakanaOnly) {
         const exactA = exprA === term ? 1 : 0;
         const exactB = exprB === term ? 1 : 0;
         if (exactA !== exactB) return exactB - exactA;
       }
 
-      const lenA = matchedLenMap.get(a);
-      const lenB = matchedLenMap.get(b);
+      // Hiragana exact-match priority
+      if (currentPrioritizeHiraganaMatch && isHiraganaOnly) {
+        const exactA = exprA === term ? 1 : 0;
+        const exactB = exprB === term ? 1 : 0;
+        if (exactA !== exactB) return exactB - exactA;
+      }
+
+      const origA = getOrigLen(fa);
+      const origB = getOrigLen(fb);
+
+      // Prefer the entry whose deinflection consumed more of the original text
+      if (origA !== origB) return origB - origA;
+
+      // Fall back to kana prefix-match when termEntries gave the same (or no) length
+      const lenA = computeMatchedLen(termChars, exprA, fa.reading || '');
+      const lenB = computeMatchedLen(termChars, exprB, fb.reading || '');
 
       if (!currentPrioritizeKanjiMatch) {
-         // Matched-length priority (common prefix with term, kana-normalized)
-         if (lenA !== lenB) return lenB - lenA;
+        // Matched-length priority (common prefix with term, kana-normalized)
+        if (lenA !== lenB) return lenB - lenA;
 
-         // Kanji priority
-         const kanjiA = (exprA && exprA !== fa.reading) ? 1 : 0;
-         const kanjiB = (exprB && exprB !== fb.reading) ? 1 : 0;
-         if (kanjiA !== kanjiB) return kanjiB - kanjiA;
+        // Kanji priority
+        const kanjiA = (exprA && fa.reading && exprA !== fa.reading) ? 1 : 0;
+        const kanjiB = (exprB && fb.reading && exprB !== fb.reading) ? 1 : 0;
+        if (kanjiA !== kanjiB) return kanjiB - kanjiA;
 
-         return 0;
+        return 0;
       } else {
-         // Kanji priority
-         const kanjiA = (exprA && exprA !== fa.reading) ? 1 : 0;
-         const kanjiB = (exprB && exprB !== fb.reading) ? 1 : 0;
-         if (kanjiA !== kanjiB) return kanjiB - kanjiA;
+        // Kanji priority
+        const kanjiA = (exprA && exprA !== fa.reading) ? 1 : 0;
+        const kanjiB = (exprB && exprB !== fb.reading) ? 1 : 0;
+        if (kanjiA !== kanjiB) return kanjiB - kanjiA;
 
-         // Fallback to matched length
-         return lenB - lenA;
+        // Fallback to matched length
+        return lenB - lenA;
       }
     });
 
@@ -562,8 +618,15 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
 
 ipcRenderer.on('lookup-term', async (event, data) => {
   console.log('[IPC] Received lookup data:', JSON.stringify(data));
+  
+  if (data.theme === 'light') {
+    document.body.classList.add('light-theme');
+  } else {
+    document.body.classList.remove('light-theme');
+  }
+
   lookupHistory = [];
-  performLookup(data.term, data.showFrequencies, data.showPitchAccents, false, data.prioritizeKanjiMatch);
+  performLookup(data.term, data.showFrequencies, data.showPitchAccents, false, data.prioritizeKanjiMatch, data.prioritizeHiraganaMatch);
 });
 
 ipcRenderer.on('window-hide-request', () => {

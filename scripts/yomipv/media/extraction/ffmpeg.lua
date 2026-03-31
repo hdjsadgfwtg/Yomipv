@@ -17,10 +17,16 @@ function FFmpegEncoder.generate_picture_args(config, source, output, time, durat
 		"-y",
 	}
 
+	local lead_in = 10
+	local jump = math.max(0, time - lead_in)
+	local sweep = time - jump
+
+	table.insert(args, "-ss")
+	table.insert(args, MediaUtils.to_timestamp_str(jump))
 	table.insert(args, "-i")
 	table.insert(args, source)
 	table.insert(args, "-ss")
-	table.insert(args, MediaUtils.to_timestamp_str(time))
+	table.insert(args, tostring(sweep))
 
 	local format, quality, width, fps
 	if config.picture_animated then
@@ -102,10 +108,17 @@ function FFmpegEncoder.generate_audio_args(config, source, output, start_time, e
 		"-y",
 	}
 
+	start_time = start_time or 0
+	local lead_in = 10
+	local jump = math.max(0, start_time - lead_in)
+	local sweep = start_time - jump
+
+	table.insert(args, "-ss")
+	table.insert(args, MediaUtils.to_timestamp_str(jump))
 	table.insert(args, "-i")
 	table.insert(args, source)
 	table.insert(args, "-ss")
-	table.insert(args, MediaUtils.to_timestamp_str(start_time or 0))
+	table.insert(args, tostring(sweep))
 
 	if end_time and start_time then
 		table.insert(args, "-t")

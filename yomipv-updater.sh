@@ -41,15 +41,46 @@ get_config() {
     fi
 }
 
+get_mpv_instances() {
+    if command -v pgrep &> /dev/null; then
+        pgrep -a mpv | cut -d' ' -f2-
+    fi
+}
+
+stop_yomipv_processes() {
+    echo -e "${CYAN}Checking for running Yomipv processes...${NC}"
+    if command -v pkill &> /dev/null; then
+        pkill -f "YomipvLookup" &> /dev/null
+        pkill -x mpv &> /dev/null
+        sleep 1
+    fi
+}
+
+restart_mpv_instances() {
+    local instances="$1"
+    if [ -n "$instances" ]; then
+        echo -e "${CYAN}Restarting MPV instances...${NC}"
+        echo "$instances" | while IFS= read -r cmd; do
+            if [ -n "$cmd" ]; then
+                ( $cmd > /dev/null 2>&1 & )
+            fi
+        done
+    fi
+}
+
 merge_config() {
     local old_conf="$1"
     local conf_file="$SCRIPT_DIR/script-opts/yomipv.conf"
     if [ -n "$old_conf" ] && [ -f "$conf_file" ]; then
         echo -e "${CYAN}Restoring user configuration settings...${NC}"
         echo "$old_conf" | while IFS='=' read -r key value; do
-            if [ -n "$key" ] && grep -q "^\s*$key\s*=" "$conf_file"; then
-                local escaped_val=$(echo "$value" | sed 's/[&/\]/\\&/g')
-                sed -i "s|^\(\s*$key\s*=\s*\).*|\1$escaped_val|" "$conf_file"
+            if [ -n "$key" ]; then
+                if grep -q "^\s*#\?\s*$key\s*=" "$conf_file"; then
+                    local escaped_val=$(echo "$value" | sed 's/[&/\]/\\&/g')
+                    sed -i "0,/^\s*#\?\s*$key\s*=/ s|^\s*#\?\(\s*$key\s*=\s*\).*|\1$escaped_val|" "$conf_file"
+                else
+                    echo "$key=$value" >> "$conf_file"
+                fi
             fi
         done
     fi
@@ -71,9 +102,13 @@ update_from_source() {
     
     if [ -n "$source_folder" ]; then
         echo -e "${GREEN}Applying source changes...${NC}"
+        local mpv_instances=$(get_mpv_instances)
+        stop_yomipv_processes
+        
         # Copy everything except .git
         cp -r "$source_folder"* "$SCRIPT_DIR/"
         merge_config "$old_conf"
+        restart_mpv_instances "$mpv_instances"
     fi
     
     rm -f "$temp_zip"
@@ -95,8 +130,14 @@ if [ -d "$SCRIPT_DIR/.git" ]; then
     
     echo -e "${GREEN}New updates available. Pulling...${NC}"
     local old_conf=$(get_config)
+    local mpv_instances=$(get_mpv_instances)
+    stop_yomipv_processes
+    
     git pull origin main
     merge_config "$old_conf"
+    restart_mpv_instances "$mpv_instances"
+    
+    echo -e "${CYAN}Update installed!${NC}"
     exit 0
 fi
 
@@ -123,6 +164,7 @@ fi
 
 if [ "$USER_PREF" == "source" ]; then
     update_from_source
+    echo -e "${CYAN}Update installed! Please restart MPV to apply changes.${NC}"
     echo -e "${MAGENTA}Operation completed${NC}"
     exit 0
 fi
@@ -170,9 +212,14 @@ TEMP_ZIP="/tmp/yomipv-update.zip"
 curl -L -A "$USER_AGENT" -o "$TEMP_ZIP" "$ZIP_URL"
 
 old_conf=$(get_config)
+mpv_instances=$(get_mpv_instances)
+stop_yomipv_processes
+
 echo -e "${GREEN}Extracting update...${NC}"
 unzip -o -q "$TEMP_ZIP" -d "$SCRIPT_DIR"
 merge_config "$old_conf"
+restart_mpv_instances "$mpv_instances"
 
 rm -f "$TEMP_ZIP"
+echo -e "${CYAN}Update installed!${NC}"
 echo -e "${MAGENTA}Operation completed${NC}"

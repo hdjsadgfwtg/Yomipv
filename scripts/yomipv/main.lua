@@ -4,7 +4,7 @@ local mp = require("mp")
 local msg = require("mp.msg")
 local utils = require("mp.utils")
 
-local yomipv_version = "0.3.0"
+local yomipv_version = "0.3.7"
 mp.commandv("script-message", "yomipv-version", yomipv_version)
 
 local script_dir = mp.get_script_directory()
@@ -23,6 +23,7 @@ local SecondarySid = require("subtitle.secondary-sid")
 local Selector = require("interface.selector.selector")
 local History = require("interface.history.panel")
 local Builder = require("export.builder")
+local AnkiDBBuilder = require("export.anki_db_builder")
 local Formatter = require("export.formatter")
 local Handler = require("export.handler")
 local Picture = require("media.picture")
@@ -143,8 +144,8 @@ end
 
 launch_lookup_app()
 
-mp.add_key_binding(config.key_toggle_substitute, "yomipv-toggle-substitute", function()
-	handler:toggle_substitute()
+mp.add_key_binding(config.key_toggle_colorizer, "yomipv-toggle-colorizer", function()
+	handler:toggle_colorizer()
 end)
 
 mp.add_key_binding(config.key_open_selector, "yomipv-export", function()
@@ -257,6 +258,52 @@ if config.key_clear_timings ~= "" then
 	end)
 end
 
+local function version_to_number(v)
+	if not v then return 0 end
+	local v_clean = v:gsub("^v", "")
+	local major, minor, patch = v_clean:match("(%d+)%.(%d+)%.(%d+)")
+	if major and minor and patch then
+		return tonumber(major) * 1000000 + tonumber(minor) * 1000 + tonumber(patch)
+	end
+	return 0
+end
+
+local function check_for_updates()
+	if not config.updater_enabled or not config.updater_check_on_startup then
+		return
+	end
+
+	msg.info("Checking for updates in background...")
+	local api_url = "https://api.github.com/repos/BrenoAqua/Yomipv/releases/latest"
+
+	Curl.get(api_url, function(success, output, err)
+		if not success or not output or output.status ~= 0 then
+			msg.warn("Background update check failed: " .. tostring(err or "Unknown error"))
+			return
+		end
+
+		local response = utils.parse_json(output.stdout)
+		if not response or not response.tag_name then
+			msg.warn("Failed to parse GitHub release data")
+			return
+		end
+
+		local latest_version = response.tag_name
+		local current_version = yomipv_version
+
+		if version_to_number(latest_version) > version_to_number(current_version) then
+			msg.info("New version available: " .. latest_version)
+			Player.notify(
+				string.format("New Yomipv update available: %s (Press '%s' to update)", latest_version, config.key_update),
+				"info",
+				15
+			)
+		else
+			msg.info("Yomipv is up to date")
+		end
+	end, { user_agent = "Yomipv-Updater-Bot" })
+end
+
 local function launch_updater()
 	if not config.updater_enabled then
 		return
@@ -299,23 +346,7 @@ if config.key_update ~= "" then
 end
 
 local function launch_anki_db_build()
-	local script_path = Platform.normalize_path(utils.join_path(script_dir, "build_anki_db.py"))
-
-	-- Resolve script-opts relative to script directory
-	local output_path = utils.join_path(script_dir, "../../script-opts/anki_words.json")
-	local absolute_output_path = Platform.normalize_path(mp.command_native({ "expand-path", output_path }))
-	local url = "http://" .. config.ankiconnect_url
-
-	local progress_file = Platform.normalize_path(utils.join_path(Platform.get_temp_dir(), "yomipv_anki_db_progress.txt"))
-	local progress_timer = nil
-
-	local function clear_progress()
-		if progress_timer then
-			progress_timer:kill()
-			progress_timer = nil
-		end
-		pcall(os.remove, progress_file)
-	end
+	local db_builder = AnkiDBBuilder.new(config, anki)
 
 	local function draw_progress_bar(current, total)
 		local percent = math.floor((current / total) * 100)
@@ -325,38 +356,15 @@ local function launch_anki_db_build()
 		return string.format("Building Anki database... %s %d%%", bar, percent)
 	end
 
-	clear_progress()
-	progress_timer = mp.add_periodic_timer(0.2, function()
-		local f = io.open(progress_file, "r")
-		if f then
-			local content = f:read("*l")
-			f:close()
-			if content then
-				local cur, tot = content:match("(%d+)/(%d+)")
-				if cur and tot then
-					Player.notify(draw_progress_bar(tonumber(cur), tonumber(tot)), "info", 1)
-				end
-			end
-		end
-	end)
+	db_builder.on_progress = function(current, total)
+		Player.notify(draw_progress_bar(current, total), "info", 1)
+	end
 
-	msg.info("Building Anki database: " .. script_path)
+	msg.info("Building Anki database (Lua)...")
 	Player.notify("Building Anki database...", "info", 5)
 
-	local args = { "python", script_path, "--url", url, "--output", absolute_output_path, "--field" }
-	for field in config.ankidb_fields:gmatch("%S+") do
-		table.insert(args, field)
-	end
-	table.insert(args, "--progress-file")
-	table.insert(args, progress_file)
-
-	mp.command_native_async({
-		name = "subprocess",
-		playback_only = false,
-		args = args,
-	}, function(success, result, err)
-		clear_progress()
-		if success and result.status == 0 then
+	db_builder:build(function(success, err)
+		if success then
 			msg.info("Anki database built successfully")
 			Player.notify("Anki database built successfully", "success")
 			-- Reload database in memory
@@ -369,9 +377,6 @@ local function launch_anki_db_build()
 			end
 		else
 			local error_msg = "Failed to build Anki database"
-			if result and result.status ~= 0 then
-				error_msg = error_msg .. " (status " .. result.status .. ")"
-			end
 			msg.error(error_msg .. ": " .. tostring(err))
 			Player.notify(error_msg, "error")
 		end
@@ -419,6 +424,7 @@ mp.register_script_message("yomipv-active-entry", function(expression, reading)
 	end
 end)
 
+check_for_updates()
 msg.info("Yomipv v" .. yomipv_version .. ": Initialized")
 Player.notify("Yomipv v" .. yomipv_version .. " loaded", "success", 2)
 

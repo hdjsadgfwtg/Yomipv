@@ -33,6 +33,45 @@ function Yomitan:clear_cache()
 	self._tokenize_cache_keys = {}
 end
 
+local function is_hiragana_only(s)
+	if not s or s == "" then
+		return false
+	end
+
+	local char_count = 0
+	local hiragana_count = 0
+
+	local i = 1
+	while i <= #s do
+		local b1 = s:byte(i)
+		local b2 = s:byte(i + 1)
+		local b3 = s:byte(i + 2)
+
+		if b1 == 227 and b2 and b3 then
+			-- Hiragana range: U+3041 to U+309F
+			-- U+3041: E3 81 81 (227 129 129)
+			-- U+309F: E3 82 9F (227 130 159)
+			if (b2 == 129 and b3 >= 129) or (b2 == 130 and b3 <= 159) then
+				hiragana_count = hiragana_count + 1
+			end
+			i = i + 3
+		else
+			if b1 < 128 then
+				i = i + 1
+			elseif b1 < 224 then
+				i = i + 2
+			elseif b1 < 240 then
+				i = i + 3
+			else
+				i = i + 4
+			end
+		end
+		char_count = char_count + 1
+	end
+
+	return char_count > 0 and char_count == hiragana_count
+end
+
 local function is_katakana_only(s)
 	if not s or s == "" then
 		return false
@@ -213,10 +252,19 @@ function Yomitan:tokenize(text, callback, scan_length)
 	local sl = scan_length or DEFAULT_SCAN_LENGTH
 	local cache_key = tostring(text) .. "_" .. tostring(sl)
 
+	-- Make a copy so modifying it later doesn't affect the cached tokens
+	local function copy_tokens(tokens)
+		local copy = {}
+		for i = 1, #tokens do
+			copy[i] = tokens[i]
+		end
+		return copy
+	end
+
 	if self._tokenize_cache[cache_key] then
 		msg.info("yomitan.tokenize using cached result for: " .. tostring(text))
 		local entry = self._tokenize_cache[cache_key]
-		return callback(entry.tokens, entry.content)
+		return callback(copy_tokens(entry.tokens), entry.content)
 	end
 
 	local params = {
@@ -245,7 +293,8 @@ function Yomitan:tokenize(text, callback, scan_length)
 			content = content,
 		}
 
-		callback(tokens, content)
+		-- Don't modify the cached tokens
+		callback(copy_tokens(tokens), content)
 	end)
 end
 
@@ -302,15 +351,48 @@ function Yomitan:get_anki_fields(term, markers, context, callback, active_expres
 			end
 		end
 
-		-- If no pinned entry found or no pin provided, score current results
-		-- Matches the hierarchy in lookup-app/renderer.js
-		local best_score = -1
 		local current_pinned = (active_expression == selected_entry.expression)
+		if current_pinned then
+			callback({
+				fields = selected_entry,
+				dictionaryMedia = (response and response.dictionaryMedia)
+					or (response and response[1] and response[1].dictionaryMedia),
+				audioMedia = (response and response.audioMedia) or (response and response[1] and response[1].audioMedia),
+			}, nil)
+			return
+		end
 
-		if not current_pinned then
+		-- Fetch termEntries to obtain maxOriginalTextLength per headword
+		-- Deconjugated entries consume more original-text characters than shorter
+		-- literal prefix matches, so this correctly ranks them higher
+		self:request("/termEntries", { term = lookup_text }, function(te_output)
+			local orig_len_map = {}
+
+			local te_response = Yomitan.parse_result(te_output)
+			if te_response and te_response.dictionaryEntries then
+				for _, de in ipairs(te_response.dictionaryEntries) do
+					local orig_len = de.maxOriginalTextLength or 0
+					if orig_len > 0 and de.headwords then
+						for _, hw in ipairs(de.headwords) do
+							local key = (hw.term or "") .. "\0" .. (hw.reading or "")
+							if not orig_len_map[key] or orig_len_map[key] < orig_len then
+								orig_len_map[key] = orig_len
+							end
+						end
+					end
+				end
+			end
+
 			local term_is_katakana = is_katakana_only(term)
+			local term_is_hiragana = is_hiragana_only(term)
 			local term_cps = match_sort.to_normalized_codepoints(term)
 
+			local function get_orig_len(entry)
+				local key = (entry.expression or "") .. "\0" .. (entry.reading or "")
+				return orig_len_map[key] or 0
+			end
+
+			local best_score = -1
 			for _, entry in ipairs(fields_list) do
 				local score = 0
 				local expr = entry.expression or ""
@@ -321,6 +403,16 @@ function Yomitan:get_anki_fields(term, markers, context, callback, active_expres
 					score = score + 1000000
 				end
 
+				-- Hiragana priority
+				if self.config.prioritize_hiragana_match and term_is_hiragana and expr == term then
+					score = score + 1000000
+				end
+
+				-- Primary: characters consumed by Yomitan's deinflection
+				local orig_len = get_orig_len(entry)
+				score = score + (orig_len * 10000)
+
+				-- Fallback: kana prefix-match length
 				local matched = match_sort.compute_matched_len(term_cps, expr, reading)
 
 				if not self.config.prioritize_kanji_match then
@@ -328,12 +420,12 @@ function Yomitan:get_anki_fields(term, markers, context, callback, active_expres
 					score = score + (matched * 1000)
 
 					-- Kanji priority
-					if expr ~= reading then
+					if expr ~= reading and reading ~= "" then
 						score = score + 100
 					end
 				else
 					-- Kanji priority
-					if expr ~= reading then
+					if expr ~= reading and reading ~= "" then
 						score = score + 100
 					end
 
@@ -346,22 +438,22 @@ function Yomitan:get_anki_fields(term, markers, context, callback, active_expres
 					selected_entry = entry
 				end
 			end
-		end
 
-		msg.info(
-			string.format(
-				"Selected entry: %s from %s",
-				selected_entry.expression or "nil",
-				selected_entry.dictionary or "unknown"
+			msg.info(
+				string.format(
+					"Selected entry: %s from %s",
+					selected_entry.expression or "nil",
+					selected_entry.dictionary or "unknown"
+				)
 			)
-		)
 
-		callback({
-			fields = selected_entry,
-			dictionaryMedia = (response and response.dictionaryMedia)
-				or (response and response[1] and response[1].dictionaryMedia),
-			audioMedia = (response and response.audioMedia) or (response and response[1] and response[1].audioMedia),
-		}, nil)
+			callback({
+				fields = selected_entry,
+				dictionaryMedia = (response and response.dictionaryMedia)
+					or (response and response[1] and response[1].dictionaryMedia),
+				audioMedia = (response and response.audioMedia) or (response and response[1] and response[1].audioMedia),
+			}, nil)
+		end)
 	end)
 end
 
