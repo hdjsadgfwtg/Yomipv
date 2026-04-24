@@ -39,7 +39,9 @@
   --tag-text: #4c566a;
   --tag-bg-alt: #fff0f0;
   --selection-color: #00D179;
-  
+  --link-color: #2e3440;
+  --devoiced-color: #3474FF;
+
   /* pitch colors */
   --pitch-red: #D62839;
   --pitch-blue: #3474FF;
@@ -494,6 +496,20 @@ div[style*="border-left"] {
   --dict-color-dark: rgba(255, 255, 255, 0.4);
 }
 
+.light-theme [data-dictionary*="大辞泉"] {
+  --meikyo-white: #ffffff;
+  --meikyo-black: #333333;
+  --meikyo-blue: #0066cc;
+  --meikyo-red: #cc0000;
+  --meikyo-gray: #666666;
+  --meikyo-pink: #cc3366;
+  --meikyo-dark-red: #993333;
+  --meikyo-fbox-white: #ffffff;
+  --meikyo-fbox-gray: #999999;
+  --meikyo-box-gray: #f0e0e0;
+  --dict-color-dark: rgba(0, 0, 0, 0.4);
+}
+
 [data-dictionary*="明鏡国語辞典"] div[data-sc-ruigo_items] {
 	display: none !important;
 }
@@ -574,6 +590,27 @@ li[data-dictionary="明鏡国語辞典 第三版"] [data-sc-img] span[style*="--
 	--rgko12-gray: rgba(255, 255, 255, 0.1);
 	--rgko12-brown: #885522;
 	--rgko12-light-light-brown: ;
+}
+
+.light-theme li[data-dictionary*="小学館例解学習国語"] {
+  --rgko12-light-blue: #7fb4f3;
+  --rgko12-light-light-blue: #DDEEFF;
+  --rgko12-light-light-purple: #EEDDFF;
+  --rgko12-cream: #333300;
+  --rgko12-spring: #DDFFEE;
+  --rgko12-summer: #DDFFEE;
+  --rgko12-autumn: #FFEECC;
+  --rgko12-winter: #CCEEFF;
+  --rgko12-travel: #DDFFEE;
+  --rgko12-romance: #EEDDFF;
+  --rgko12-other: #FFFFCC;
+  --rgko12-red: #cc2222;
+  --rgko12-orange: #cc7700;
+  --rgko12-light-orange: #FFCC99;
+  --rgko12-pink: #cc0077;
+  --rgko12-gray: rgba(0, 0, 0, 0.05);
+  --rgko12-brown: #976B33;
+  --rgko12-light-brown: #696158;
 }
 
 .yomitan-glossary [data-dictionary="小学館例解学習国語 第十二版"] [data-sc-num] {
@@ -703,6 +740,19 @@ li[data-dictionary="小学館例解学習国語 第十二版"] table[data-sc使�
   --daijisen-background-l3: #606060;
   --daijisen-accent-mark: #ff6666;
   --daijisen-accent-slash: #a0a0a0;
+}
+
+.light-theme [data-dictionary*="大辞泉"] {
+  --daijisen-black: #000000;
+  --daijisen-white: #ffffff;
+  --daijisen-blue: #0055cc;
+  --daijisen-header-djs: #a0484f;
+  --daijisen-header-djsp: #555555;
+  --daijisen-header-text: #000000;
+  --daijisen-logo-color: #999999;
+  --daijisen-background-l3: #e0e0e0;
+  --daijisen-accent-mark: #cc3333;
+  --daijisen-accent-slash: #666666;
 }
 
 [data-sc-class="bold FM"], [data-sc-class="IM"], [data-sc-class="FM"] {

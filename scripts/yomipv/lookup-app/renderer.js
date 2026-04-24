@@ -13,6 +13,8 @@ let allEntries = [];
 let currentEntryIndex = 0;
 let currentShowFrequencies = false;
 let currentDictionaryMedia = [];
+let yomitanBaseUrl = 'http://127.0.0.1:19633';
+let yomitanApiKey = '';
 let lookupHistory = [];
 let currentAbortController = null;
 let currentPrioritizeKanjiMatch = false;
@@ -266,6 +268,18 @@ const renderEntry = (index, rawEntries, showFrequencies, showPitchAccents) => {
     });
 
     glossaryEl.innerHTML = tempDiv.innerHTML;
+
+    // Hoshi-style: inject per-dictionary scoped base color based on theme,
+    // then let dictionary-specific CSS variables override for specific elements
+    const isDark = !document.body.classList.contains('light-theme');
+    glossaryEl.querySelectorAll('[data-dictionary]').forEach(dictEl => {
+      const dictName = dictEl.getAttribute('data-dictionary');
+      const baseColor = isDark ? '#e0e0e0' : '#2e3440';
+      const style = document.createElement('style');
+      style.className = 'dict-theme-base';
+      style.textContent = `[data-dictionary="${CSS.escape(dictName)}"] { color: ${baseColor}; }`;
+      dictEl.prepend(style);
+    });
   } else {
     glossaryEl.innerHTML = `No result found.`;
   }
@@ -401,7 +415,8 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
 
   try {
     let result;
-    const endpoints = [`http://127.0.0.1:19633/ankiFields`, `http://127.0.0.1:19633/api/ankiFields`];
+    const apiHeaders = { 'Content-Type': 'application/json', ...(yomitanApiKey ? { 'X-API-Key': yomitanApiKey } : {}) };
+    const endpoints = [`${yomitanBaseUrl}/ankiFields`, `${yomitanBaseUrl}/api/ankiFields`];
 
     for (const url of endpoints) {
       if (signal.aborted) return;
@@ -409,7 +424,7 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
         const response = await fetch(url, {
           method: 'POST',
           signal: signal,
-          headers: { 'Content-Type': 'application/json' },
+          headers: apiHeaders,
           body: JSON.stringify({
             text: term,
             type: 'term',
@@ -470,8 +485,8 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
     const origLenMap = new Map();
     try {
       const termEntriesEndpoints = [
-        `http://127.0.0.1:19633/termEntries`,
-        `http://127.0.0.1:19633/api/termEntries`,
+        `${yomitanBaseUrl}/termEntries`,
+        `${yomitanBaseUrl}/api/termEntries`,
       ];
       let teResult;
       for (const url of termEntriesEndpoints) {
@@ -480,7 +495,7 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
           const r = await fetch(url, {
             method: 'POST',
             signal,
-            headers: { 'Content-Type': 'application/json' },
+            headers: apiHeaders,
             body: JSON.stringify({ term }),
           });
           if (r.ok) { teResult = await r.json(); break; }
@@ -618,7 +633,10 @@ const performLookup = async (term, showFrequencies, showPitchAccents, isBack = f
 
 ipcRenderer.on('lookup-term', async (event, data) => {
   console.log('[IPC] Received lookup data:', JSON.stringify(data));
-  
+
+  if (data.yomitanUrl) yomitanBaseUrl = data.yomitanUrl;
+  if (data.yomitanApiKey !== undefined) yomitanApiKey = data.yomitanApiKey;
+
   if (data.theme === 'light') {
     document.body.classList.add('light-theme');
   } else {
